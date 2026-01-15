@@ -19,6 +19,8 @@ export interface VariableValue {
   value: unknown;
   expandable?: boolean;
   variablesReference?: number;
+  /** True if this variable references an already-visited object (circular reference) */
+  circular?: boolean;
 }
 
 // Stack frame in output

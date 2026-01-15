@@ -35,6 +35,8 @@ export class VariableInspector {
    */
   async getLocals(frameId: number): Promise<Record<string, VariableValue>> {
     const result: Record<string, VariableValue> = {};
+    // Track visited variablesReferences to detect circular references
+    const visited = new Set<number>();
 
     try {
       const scopesResponse = await this.client.scopes({ frameId });
@@ -48,7 +50,7 @@ export class VariableInspector {
           });
 
           for (const v of vars.variables) {
-            result[v.name] = await this.expandVariable(v, this.options.maxDepth);
+            result[v.name] = await this.expandVariable(v, this.options.maxDepth, visited);
           }
         }
       }
@@ -62,8 +64,15 @@ export class VariableInspector {
 
   /**
    * Expand a single variable to the specified depth
+   * @param v The variable to expand
+   * @param depth Maximum expansion depth
+   * @param visited Set of already-visited variablesReferences to detect circular references
    */
-  async expandVariable(v: DapVariable, depth: number = 2): Promise<VariableValue> {
+  async expandVariable(
+    v: DapVariable,
+    depth: number = 2,
+    visited: Set<number> = new Set()
+  ): Promise<VariableValue> {
     const variable: VariableValue = {
       type: v.type || "unknown",
       value: this.parseValue(v.value, v.type),
@@ -73,6 +82,16 @@ export class VariableInspector {
 
     // Auto-expand objects to the specified depth
     if (v.variablesReference > 0 && depth > 0) {
+      // Check for circular reference
+      if (visited.has(v.variablesReference)) {
+        variable.value = "[Circular Reference]";
+        variable.circular = true;
+        return variable;
+      }
+
+      // Mark this reference as visited
+      visited.add(v.variablesReference);
+
       try {
         const children = await this.client.variables({
           variablesReference: v.variablesReference,
@@ -84,13 +103,13 @@ export class VariableInspector {
           variable.value = {
             type: v.type || "collection",
             count: this.getCollectionCount(v, children.variables.length),
-            items: await this.expandCollection(children.variables, depth - 1),
+            items: await this.expandCollection(children.variables, depth - 1, visited),
           };
         } else {
           // Regular object
           const obj: Record<string, VariableValue> = {};
           for (const child of children.variables) {
-            obj[child.name] = await this.expandVariable(child, depth - 1);
+            obj[child.name] = await this.expandVariable(child, depth - 1, visited);
           }
           variable.value = obj;
         }
@@ -212,12 +231,13 @@ export class VariableInspector {
    */
   private async expandCollection(
     items: DapVariable[],
-    depth: number
+    depth: number,
+    visited: Set<number>
   ): Promise<VariableValue[]> {
     const result: VariableValue[] = [];
 
     for (const item of items.slice(0, this.options.maxCollectionItems)) {
-      result.push(await this.expandVariable(item, depth));
+      result.push(await this.expandVariable(item, depth, visited));
     }
 
     return result;
