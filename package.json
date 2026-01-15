@@ -8,6 +8,7 @@
     "debug-run": "dist/index.js"
   },
   "scripts": {
+    "prepare": "npm run build",
     "build": "bun build ./src/index.ts --outdir ./dist --target node",
     "compile": "bun build --compile ./src/index.ts --outfile debug-run",
     "dev": "bun run ./src/index.ts",
