@@ -343,14 +343,17 @@ export class DapClient extends EventEmitter {
 
   /**
    * Disconnect from the debug session
+   * @param terminateDebuggee - If true, the debuggee process will be terminated.
+   *                           For attach mode, this should be false to leave the process running.
+   * @param restart - If true, request the debug adapter to restart the session.
    */
-  async disconnect(restart: boolean = false): Promise<void> {
+  async disconnect(terminateDebuggee: boolean = true, restart: boolean = false): Promise<void> {
     if (!this.transport?.isOpen()) return;
 
     try {
       await this.transport.sendRequest("disconnect", {
         restart,
-        terminateDebuggee: true,
+        terminateDebuggee,
       });
     } catch {
       // Ignore errors during disconnect

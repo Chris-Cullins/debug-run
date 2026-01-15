@@ -467,9 +467,11 @@ export class DebugSession {
     }
 
     // Disconnect client
+    // In attach mode, don't terminate the debuggee - leave the process running
     if (this.client?.isConnected()) {
       try {
-        await this.client.disconnect();
+        const terminateDebuggee = !this.config.attach;
+        await this.client.disconnect(terminateDebuggee);
       } catch {
         // Ignore cleanup errors
       }
