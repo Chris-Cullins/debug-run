@@ -163,6 +163,54 @@ Use vsdbg instead:
 -a vsdbg  # instead of -a netcoredbg
 ```
 
+## Attach Mode (Debugging Running Processes)
+
+Attach to a running process instead of launching:
+
+```bash
+# Start your app (note the PID)
+cd samples/aspnet/SampleApi && dotnet run
+# Output: SampleApi starting... PID: 12345
+
+# Attach debug-run
+npx tsx ./src/index.ts --attach --pid 12345 \
+  -a vsdbg \
+  -b "samples/aspnet/SampleApi/Program.cs:16" \
+  -e "svc._orders.Count" \
+  --pretty \
+  -t 30s
+```
+
+### Important Attach Mode Behaviors
+
+1. **Timing matters**: After `process_attached` event, wait 10-15 seconds before triggering the code path. The debugger needs time to fully instrument the process and verify breakpoints.
+
+2. **Breakpoints start as `verified: false`**: This is normal. They become verified when the code path is first hit or the JIT recompiles.
+
+3. **Process survives**: In attach mode, the debuggee keeps running after debug-run exits. This is intentional for long-running services.
+
+4. **Expression evaluation timing**: Expressions are evaluated BEFORE the breakpoint line executes. Variables assigned ON that line will be null/unset.
+
+### Testing Attach Mode with ASP.NET
+
+There's a sample ASP.NET Web API in `samples/aspnet/SampleApi/`:
+
+```bash
+# Build and run the sample API
+cd samples/aspnet/SampleApi
+dotnet build
+dotnet run  # Runs on http://localhost:5009
+
+# Good breakpoint locations:
+# - Line 16: GET /orders handler
+# - Line 23: GET /orders/{id} handler
+# - Line 39: POST /orders/{id}/process handler
+
+# Test endpoints:
+curl http://localhost:5009/orders
+curl -X POST http://localhost:5009/orders/ORD-001/process
+```
+
 ## File Structure
 
 ```
@@ -178,7 +226,29 @@ src/
 └── output/           # Event formatting
 
 samples/
-└── dotnet/           # Sample .NET app for testing
-    ├── Program.cs    # Test target with order processing
-    └── SampleApp.csproj
+├── dotnet/           # Console app for testing launch mode
+│   ├── Program.cs    # Order processing simulation
+│   └── SampleApp.csproj
+└── aspnet/           # Web API for testing attach mode
+    └── SampleApi/
+        └── Program.cs  # Minimal API with orders endpoints
 ```
+
+## Non-Obvious Implementation Details
+
+### Shell Command Quoting
+When using conditional breakpoints with special characters, use single quotes:
+```bash
+-b 'samples/dotnet/Program.cs:67?order.Total > 100'
+```
+
+### vsdbg Handshake
+vsdbg requires a cryptographic handshake. The tool handles this automatically via `src/util/vsda-signer.ts` which uses the VS Code extension's signing mechanism.
+
+### DAP Protocol Flow
+1. `initialize` → capabilities exchange
+2. `setBreakpoints` → configure breakpoints (may be pending)
+3. `launch` or `attach` → start/connect to debuggee
+4. `configurationDone` → signal ready
+5. `stopped` events → breakpoint hits, capture state, `continue`
+6. `disconnect` → detach (terminateDebuggee=false for attach mode)
