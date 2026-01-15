@@ -57,6 +57,36 @@ export function parseBreakpointSpec(spec: string): BreakpointSpec {
   };
 }
 
+/**
+ * Parse a logpoint specification string
+ *
+ * Format: "file.ts:45|log message with {expr}"
+ * The log message can contain expressions in {braces} that will be evaluated.
+ */
+export function parseLogpointSpec(spec: string): BreakpointSpec {
+  // Match: file:line|logMessage
+  const match = spec.match(/^(.+):(\d+)\|(.+)$/);
+
+  if (!match) {
+    throw new Error(
+      `Invalid logpoint format: "${spec}". Expected "file:line|log message"`
+    );
+  }
+
+  const [, file, lineStr, logMessage] = match;
+  const line = parseInt(lineStr, 10);
+
+  if (isNaN(line) || line < 1) {
+    throw new Error(`Invalid line number: ${lineStr}`);
+  }
+
+  return {
+    file: path.resolve(file),
+    line,
+    logMessage: logMessage.trim(),
+  };
+}
+
 export class BreakpointManager {
   private client: DapClient;
   private formatter: OutputFormatter;
@@ -75,6 +105,15 @@ export class BreakpointManager {
     const bp = parseBreakpointSpec(spec);
     this.addBreakpointSpec(bp);
     return bp;
+  }
+
+  /**
+   * Add a logpoint from a spec string
+   */
+  addLogpoint(spec: string): BreakpointSpec {
+    const lp = parseLogpointSpec(spec);
+    this.addBreakpointSpec(lp);
+    return lp;
   }
 
   /**

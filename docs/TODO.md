@@ -63,16 +63,16 @@ A CLI tool that enables AI agents to programmatically debug code via the Debug A
 - [x] Capture `this` context
 - [ ] Handle circular references in variable expansion
 
-## Phase 3: Conditional Breakpoints & Exceptions
+## Phase 3: Conditional Breakpoints & Exceptions ✅
 
 **Goal:** More control over when to break.
 
 - [x] Support conditional breakpoints (`file:line?condition` syntax)
 - [x] Support hit count breakpoints (`file:line#count` syntax)
-- [ ] Implement `setExceptionBreakpoints` DAP request
-- [ ] Handle `--break-on-exception` CLI flag
-- [ ] Support caught vs uncaught exception filtering
-- [ ] Implement logpoints (log without breaking)
+- [x] Implement `setExceptionBreakpoints` DAP request
+- [x] Handle `--break-on-exception` CLI flag
+- [x] Support caught vs uncaught exception filtering
+- [x] Implement logpoints (log without breaking)
 
 ## Phase 4: Stepping & Flow Control
 

@@ -106,6 +106,20 @@ export interface ExceptionThrownEvent extends BaseEvent {
   locals: Record<string, VariableValue>;
 }
 
+export interface ExceptionBreakpointSetEvent extends BaseEvent {
+  type: "exception_breakpoint_set";
+  filters: string[];
+}
+
+// Logpoint events
+export interface LogpointHitEvent extends BaseEvent {
+  type: "logpoint_hit";
+  id?: number;
+  threadId: number;
+  location: SourceLocation;
+  logOutput: string;
+}
+
 // Stepping events
 export interface StepCompletedEvent extends BaseEvent {
   type: "step_completed";
@@ -138,6 +152,8 @@ export type DebugEvent =
   | BreakpointSetEvent
   | BreakpointHitEvent
   | ExceptionThrownEvent
+  | ExceptionBreakpointSetEvent
+  | LogpointHitEvent
   | StepCompletedEvent
   | ProgramOutputEvent
   | ErrorEvent;

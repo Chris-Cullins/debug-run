@@ -16,7 +16,9 @@ export interface CliOptions {
   args?: string[];
   cwd?: string;
   breakpoint: string[];
+  logpoint: string[];
   eval: string[];
+  breakOnException?: string[];
   timeout?: string;
   captureLocals?: boolean;
   pretty?: boolean;
@@ -71,6 +73,15 @@ export function createCli(): Command {
       []
     )
     .option(
+      "-l, --logpoint <spec...>",
+      'Logpoint specifications (e.g., "file.ts:45|log message with {expr}")',
+      []
+    )
+    .option(
+      "--break-on-exception <filter...>",
+      'Break on exceptions (e.g., "all", "user-unhandled", "uncaught")'
+    )
+    .option(
       "-t, --timeout <duration>",
       "Session timeout (e.g., 30s, 5000ms, 2m)",
       "60s"
@@ -81,7 +92,7 @@ export function createCli(): Command {
     .addOption(
       new Option("--env <key=value...>", "Environment variables for the program")
     )
-    .action(async (programPath: string | undefined, options: Omit<CliOptions, "program"> & { env?: string[]; adapter?: string }) => {
+    .action(async (programPath: string | undefined, options: Omit<CliOptions, "program"> & { env?: string[]; adapter?: string; logpoint?: string[]; breakOnException?: string[] }) => {
       // Validate required options
       if (!programPath) {
         console.error("Error: <program> argument is required");
@@ -132,10 +143,24 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
     process.exit(1);
   }
 
-  // Validate breakpoints
-  if (options.breakpoint.length === 0) {
-    console.error("Error: At least one --breakpoint is required");
+  // Validate breakpoints (or exception breakpoints must be specified)
+  const hasBreakpoints = options.breakpoint.length > 0 || (options.logpoint && options.logpoint.length > 0);
+  const hasExceptionBreakpoints = options.breakOnException && options.breakOnException.length > 0;
+
+  if (!hasBreakpoints && !hasExceptionBreakpoints) {
+    console.error("Error: At least one --breakpoint, --logpoint, or --break-on-exception is required");
     process.exit(1);
+  }
+
+  // Validate exception breakpoint filters against adapter's supported filters
+  if (hasExceptionBreakpoints && adapter.exceptionFilters) {
+    for (const filter of options.breakOnException!) {
+      if (!adapter.exceptionFilters.includes(filter)) {
+        console.error(`Error: Adapter "${adapter.name}" does not support exception filter "${filter}"`);
+        console.error(`Supported filters: ${adapter.exceptionFilters.join(", ")}`);
+        process.exit(1);
+      }
+    }
   }
 
   // Parse environment variables
@@ -164,6 +189,8 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
       cwd: options.cwd,
       env: Object.keys(env).length > 0 ? env : undefined,
       breakpoints: options.breakpoint,
+      logpoints: options.logpoint && options.logpoint.length > 0 ? options.logpoint : undefined,
+      exceptionFilters: options.breakOnException,
       evaluations: options.eval.length > 0 ? options.eval : undefined,
       timeout,
       captureLocals: options.captureLocals,

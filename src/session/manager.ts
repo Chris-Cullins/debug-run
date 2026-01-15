@@ -31,6 +31,8 @@ export interface SessionConfig {
   cwd?: string;
   env?: Record<string, string>;
   breakpoints: string[];
+  logpoints?: string[];
+  exceptionFilters?: string[];
   evaluations?: string[];
   timeout?: number;
   captureLocals?: boolean;
@@ -139,9 +141,28 @@ export class DebugSession {
       this.breakpointManager.addBreakpoint(bp);
     }
 
-    // Set breakpoints
+    // Add logpoints
+    if (this.config.logpoints) {
+      for (const lp of this.config.logpoints) {
+        this.breakpointManager.addLogpoint(lp);
+      }
+    }
+
+    // Set breakpoints and logpoints
     this.state = "configuring";
     await this.breakpointManager.setAllBreakpoints();
+
+    // Set exception breakpoints
+    if (this.config.exceptionFilters && this.config.exceptionFilters.length > 0) {
+      await this.client.setExceptionBreakpoints({
+        filters: this.config.exceptionFilters,
+      });
+      this.formatter.emit(
+        this.formatter.createEvent("exception_breakpoint_set", {
+          filters: this.config.exceptionFilters,
+        })
+      );
+    }
 
     // Launch the program
     const launchConfig = this.config.adapter.launchConfig({
