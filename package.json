@@ -1,0 +1,47 @@
+{
+  "name": "debug-run",
+  "version": "0.1.0",
+  "description": "CLI tool enabling AI agents to programmatically debug code via DAP",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "debug-run": "dist/index.js"
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target node",
+    "compile": "bun build --compile ./src/index.ts --outfile debug-run",
+    "dev": "bun run ./src/index.ts",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vscode/debugprotocol": "^1.65.0",
+    "commander": "^12.0.0",
+    "glob": "^10.0.0",
+    "chalk": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "bun-types": "^1.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/debug-run.git"
+  },
+  "keywords": [
+    "debug",
+    "dap",
+    "debugger",
+    "cli",
+    "ai",
+    "agent"
+  ],
+  "author": "",
+  "license": "MIT"
+}
