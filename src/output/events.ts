@@ -43,9 +43,14 @@ interface BaseEvent {
 export interface SessionStartEvent extends BaseEvent {
   type: "session_start";
   adapter: string;
-  program: string;
+  /** Program path (launch mode) */
+  program?: string;
   args?: string[];
   cwd?: string;
+  /** Process ID (attach mode) */
+  pid?: number;
+  /** True if attaching to a running process */
+  attach?: boolean;
 }
 
 export interface SessionEndEvent extends BaseEvent {
@@ -63,6 +68,11 @@ export interface SessionEndEvent extends BaseEvent {
 export interface ProcessLaunchedEvent extends BaseEvent {
   type: "process_launched";
   pid?: number;
+}
+
+export interface ProcessAttachedEvent extends BaseEvent {
+  type: "process_attached";
+  pid: number;
 }
 
 export interface ProcessExitedEvent extends BaseEvent {
@@ -148,6 +158,7 @@ export type DebugEvent =
   | SessionStartEvent
   | SessionEndEvent
   | ProcessLaunchedEvent
+  | ProcessAttachedEvent
   | ProcessExitedEvent
   | BreakpointSetEvent
   | BreakpointHitEvent

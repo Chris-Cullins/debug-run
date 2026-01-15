@@ -27,7 +27,7 @@ import { VariableInspector } from "./variables.js";
 
 export interface SessionConfig {
   adapter: AdapterConfig;
-  program: string;
+  program?: string;
   args?: string[];
   cwd?: string;
   env?: Record<string, string>;
@@ -41,6 +41,10 @@ export interface SessionConfig {
   steps?: number;
   /** Whether to capture variables at each step */
   captureEachStep?: boolean;
+  /** Attach to a running process instead of launching */
+  attach?: boolean;
+  /** Process ID to attach to */
+  pid?: number;
 }
 
 type SessionState =
@@ -88,12 +92,19 @@ export class DebugSession {
     this.startTime = Date.now();
 
     // Emit session start
-    this.formatter.sessionStart(
-      this.config.adapter.name,
-      this.config.program,
-      this.config.args,
-      this.config.cwd
-    );
+    if (this.config.attach && this.config.pid) {
+      this.formatter.sessionStartAttach(
+        this.config.adapter.name,
+        this.config.pid
+      );
+    } else {
+      this.formatter.sessionStart(
+        this.config.adapter.name,
+        this.config.program!,
+        this.config.args,
+        this.config.cwd
+      );
+    }
 
     // Create promise to track session completion
     this.sessionPromise = new Promise((resolve, reject) => {
@@ -174,23 +185,43 @@ export class DebugSession {
       );
     }
 
-    // Launch the program
-    const launchConfig = this.config.adapter.launchConfig({
-      program: this.config.program,
-      args: this.config.args,
-      cwd: this.config.cwd,
-      env: this.config.env,
-    });
+    // Launch or attach
+    if (this.config.attach && this.config.pid) {
+      // Attach to running process
+      const attachConfig = this.config.adapter.attachConfig({
+        pid: this.config.pid,
+      });
 
-    await this.client.launch(launchConfig);
+      await this.client.attach(attachConfig);
 
-    // Signal configuration done
-    await this.client.configurationDone();
+      // Signal configuration done
+      await this.client.configurationDone();
 
-    this.state = "running";
-    this.formatter.emit(
-      this.formatter.createEvent("process_launched", {})
-    );
+      this.state = "running";
+      this.formatter.emit(
+        this.formatter.createEvent("process_attached", {
+          pid: this.config.pid,
+        })
+      );
+    } else {
+      // Launch the program
+      const launchConfig = this.config.adapter.launchConfig({
+        program: this.config.program!,
+        args: this.config.args,
+        cwd: this.config.cwd,
+        env: this.config.env,
+      });
+
+      await this.client.launch(launchConfig);
+
+      // Signal configuration done
+      await this.client.configurationDone();
+
+      this.state = "running";
+      this.formatter.emit(
+        this.formatter.createEvent("process_launched", {})
+      );
+    }
   }
 
   private setupEventHandlers(): void {

@@ -48,7 +48,7 @@ export class OutputFormatter {
   }
 
   /**
-   * Emit a session_start event
+   * Emit a session_start event (launch mode)
    */
   sessionStart(adapter: string, program: string, args?: string[], cwd?: string): void {
     this.emit(
@@ -57,6 +57,19 @@ export class OutputFormatter {
         program,
         args,
         cwd,
+      })
+    );
+  }
+
+  /**
+   * Emit a session_start event (attach mode)
+   */
+  sessionStartAttach(adapter: string, pid: number): void {
+    this.emit(
+      this.createEvent("session_start", {
+        adapter,
+        pid,
+        attach: true,
       })
     );
   }

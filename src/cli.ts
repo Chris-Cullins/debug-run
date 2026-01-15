@@ -12,7 +12,7 @@ import { installNetcoredbg, isNetcoredbgInstalled, getNetcoredbgPath } from "./u
 
 export interface CliOptions {
   adapter: string;
-  program: string;
+  program?: string;
   args?: string[];
   cwd?: string;
   breakpoint: string[];
@@ -24,6 +24,8 @@ export interface CliOptions {
   pretty?: boolean;
   steps?: number;
   captureEachStep?: boolean;
+  attach?: boolean;
+  pid?: number;
 }
 
 function parseTimeout(value: string): number {
@@ -104,13 +106,33 @@ export function createCli(): Command {
     .addOption(
       new Option("--env <key=value...>", "Environment variables for the program")
     )
-    .action(async (programPath: string | undefined, options: Omit<CliOptions, "program"> & { env?: string[]; adapter?: string; logpoint?: string[]; breakOnException?: string[] }) => {
-      // Validate required options
-      if (!programPath) {
-        console.error("Error: <program> argument is required");
-        console.error("Usage: debug-run <program> -a <adapter> -b <breakpoint>");
-        process.exit(1);
+    .option(
+      "--attach",
+      "Attach to a running process instead of launching",
+      false
+    )
+    .option(
+      "--pid <processId>",
+      "Process ID to attach to (requires --attach)",
+      (val: string) => parseInt(val, 10)
+    )
+    .action(async (programPath: string | undefined, options: Omit<CliOptions, "program"> & { env?: string[]; adapter?: string; logpoint?: string[]; breakOnException?: string[]; attach?: boolean; pid?: number }) => {
+      // Validate attach mode
+      if (options.attach) {
+        if (!options.pid) {
+          console.error("Error: --pid is required when using --attach");
+          console.error("Usage: debug-run --attach --pid <processId> -a <adapter> -b <breakpoint>");
+          process.exit(1);
+        }
+      } else {
+        // Launch mode requires a program
+        if (!programPath) {
+          console.error("Error: <program> argument is required (or use --attach --pid)");
+          console.error("Usage: debug-run <program> -a <adapter> -b <breakpoint>");
+          process.exit(1);
+        }
       }
+
       if (!options.adapter) {
         console.error("Error: --adapter is required");
         console.error(`Available adapters: ${getAdapterNames().join(", ")}`);
@@ -159,7 +181,8 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
   const hasBreakpoints = options.breakpoint.length > 0 || (options.logpoint && options.logpoint.length > 0);
   const hasExceptionBreakpoints = options.breakOnException && options.breakOnException.length > 0;
 
-  if (!hasBreakpoints && !hasExceptionBreakpoints) {
+  // In attach mode, breakpoints are optional (you might just want to break on exceptions)
+  if (!hasBreakpoints && !hasExceptionBreakpoints && !options.attach) {
     console.error("Error: At least one --breakpoint, --logpoint, or --break-on-exception is required");
     process.exit(1);
   }
@@ -208,6 +231,8 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
       captureLocals: options.captureLocals,
       steps: options.steps,
       captureEachStep: options.captureEachStep,
+      attach: options.attach,
+      pid: options.pid,
     },
     formatter
   );
