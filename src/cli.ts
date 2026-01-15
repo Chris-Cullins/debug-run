@@ -26,6 +26,10 @@ export interface CliOptions {
   captureEachStep?: boolean;
   attach?: boolean;
   pid?: number;
+  trace?: boolean;
+  traceInto?: boolean;
+  traceLimit?: number;
+  traceUntil?: string;
 }
 
 function parseTimeout(value: string): number {
@@ -102,6 +106,26 @@ export function createCli(): Command {
       "--capture-each-step",
       "Capture variables and location at each step",
       false
+    )
+    .option(
+      "--trace",
+      "Enable trace mode - step through code after breakpoint hit",
+      false
+    )
+    .option(
+      "--trace-into",
+      "Use stepIn instead of stepOver in trace mode (follow into function calls)",
+      false
+    )
+    .option(
+      "--trace-limit <count>",
+      "Maximum steps in trace mode before stopping (default: 500)",
+      (val: string) => parseInt(val, 10),
+      500
+    )
+    .option(
+      "--trace-until <expr>",
+      "Stop trace when expression evaluates to truthy"
     )
     .addOption(
       new Option("--env <key=value...>", "Environment variables for the program")
@@ -233,6 +257,10 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
       captureEachStep: options.captureEachStep,
       attach: options.attach,
       pid: options.pid,
+      trace: options.trace,
+      traceInto: options.traceInto,
+      traceLimit: options.traceLimit,
+      traceUntil: options.traceUntil,
     },
     formatter
   );

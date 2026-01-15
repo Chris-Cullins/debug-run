@@ -140,6 +140,88 @@ The following Phase 2 features are implemented:
 4. **'this' Context** - Instance members captured in `this` local
 5. **Circular Reference Handling** - Prevents infinite loops in object graphs
 
+## Trace Mode
+
+Trace mode automatically steps through code after hitting a breakpoint, capturing the execution path. This is useful for understanding how code flows through functions, loops, and conditionals.
+
+### Basic Trace
+
+```bash
+npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+  -a vsdbg \
+  -b "samples/dotnet/Program.cs:67" \
+  --trace \
+  --pretty \
+  -t 30s
+```
+
+### Trace Options
+
+| Option | Description |
+|--------|-------------|
+| `--trace` | Enable trace mode |
+| `--trace-into` | Use stepIn instead of stepOver (follow into function calls) |
+| `--trace-limit <N>` | Maximum steps before stopping (default: 500) |
+| `--trace-until <expr>` | Stop when expression evaluates to truthy |
+
+### Examples
+
+```bash
+# Trace up to 50 steps
+npx debug-run ./app.dll -a vsdbg \
+  -b "Program.cs:42" \
+  --trace \
+  --trace-limit 50 \
+  --pretty
+
+# Trace into function calls
+npx debug-run ./app.dll -a vsdbg \
+  -b "Program.cs:42" \
+  --trace \
+  --trace-into \
+  --pretty
+
+# Trace until a condition is met
+npx debug-run ./app.dll -a vsdbg \
+  -b "Program.cs:42" \
+  --trace \
+  --trace-until "order.Total > 100" \
+  --pretty
+```
+
+### Trace Events
+
+Trace mode emits these events:
+
+1. `trace_started` - Trace begins after breakpoint hit
+   - `startLocation` - where trace began
+   - `initialStackDepth` - stack depth at start
+   - `traceConfig` - trace configuration
+
+2. `trace_step` - Emitted for each step (lightweight)
+   - `stepNumber` - step counter
+   - `location` - current file/line/function
+   - `stackDepth` - current stack depth
+
+3. `trace_completed` - Trace finished
+   - `stopReason` - why trace stopped: `function_return`, `exception`, `breakpoint`, `limit_reached`, `expression_true`
+   - `stepsExecuted` - total steps taken
+   - `path` - array of all locations visited
+   - `locals` - captured variables at final location
+   - `evaluations` - expression results (if `-e` specified)
+
+### Stop Conditions
+
+Trace stops when any of these conditions is met:
+
+| Condition | Description |
+|-----------|-------------|
+| `function_return` | Stepped out of the breakpoint's function |
+| `exception` | An exception was thrown |
+| `breakpoint` | Hit another breakpoint |
+| `limit_reached` | Reached `--trace-limit` steps |
+| `expression_true` | `--trace-until` expression became truthy |
+
 ## Troubleshooting
 
 ### "Adapter not installed"

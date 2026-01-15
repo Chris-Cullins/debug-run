@@ -84,6 +84,53 @@ npx debug-run --attach --pid <PID> \
 
 **Important**: After attaching, wait 10-15 seconds before triggering the code path. The debugger needs time to instrument the process.
 
+## Trace Mode (Follow Execution Path)
+
+Trace mode automatically steps through code after hitting a breakpoint, capturing the execution path. Use this to understand how code flows through functions, loops, and conditionals.
+
+### Basic Trace
+
+```bash
+npx debug-run ./bin/Debug/net8.0/MyApp.dll \
+  -a vsdbg \
+  -b "src/Services/OrderService.cs:42" \
+  --trace \
+  --pretty \
+  -t 30s
+```
+
+### Trace Into Function Calls
+
+```bash
+npx debug-run ./bin/Debug/net8.0/MyApp.dll \
+  -a vsdbg \
+  -b "src/Services/OrderService.cs:42" \
+  --trace \
+  --trace-into \
+  --trace-limit 100 \
+  --pretty
+```
+
+### Trace Until Condition
+
+```bash
+npx debug-run ./bin/Debug/net8.0/MyApp.dll \
+  -a vsdbg \
+  -b "src/Services/OrderService.cs:42" \
+  --trace \
+  --trace-until "order.Total > 100" \
+  --pretty
+```
+
+### Trace Output Events
+
+- `trace_started` - Trace begins (includes config)
+- `trace_step` - Each step location (lightweight)
+- `trace_completed` - Trace finished with:
+  - `stopReason`: `function_return`, `exception`, `breakpoint`, `limit_reached`, `expression_true`
+  - `path`: Array of all locations visited
+  - `locals`: Variables at final location
+
 ## Options Reference
 
 | Option | Description |
@@ -95,6 +142,10 @@ npx debug-run --attach --pid <PID> \
 | `--pretty` | Pretty-print JSON output |
 | `--attach` | Attach to running process instead of launching |
 | `--pid <id>` | Process ID for attach mode |
+| `--trace` | Enable trace mode - step through code after breakpoint |
+| `--trace-into` | Use stepIn instead of stepOver (follow into functions) |
+| `--trace-limit <N>` | Max steps in trace mode (default: 500) |
+| `--trace-until <expr>` | Stop trace when expression is truthy |
 
 ## Output Format
 

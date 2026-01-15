@@ -139,6 +139,47 @@ export interface StepCompletedEvent extends BaseEvent {
   locals: Record<string, VariableValue>;
 }
 
+// Trace mode events
+export type TraceStopReason =
+  | "function_return"
+  | "exception"
+  | "breakpoint"
+  | "limit_reached"
+  | "expression_true"
+  | "end_of_program";
+
+export interface TraceStartedEvent extends BaseEvent {
+  type: "trace_started";
+  threadId: number;
+  startLocation: SourceLocation;
+  initialStackDepth: number;
+  traceConfig: {
+    stepInto: boolean;
+    limit: number;
+    untilExpression?: string;
+  };
+}
+
+export interface TraceStepEvent extends BaseEvent {
+  type: "trace_step";
+  threadId: number;
+  stepNumber: number;
+  location: SourceLocation;
+  stackDepth?: number;
+}
+
+export interface TraceCompletedEvent extends BaseEvent {
+  type: "trace_completed";
+  threadId: number;
+  stopReason: TraceStopReason;
+  stepsExecuted: number;
+  path: SourceLocation[];
+  finalLocation: SourceLocation;
+  stackTrace: StackFrameInfo[];
+  locals: Record<string, VariableValue>;
+  evaluations?: Record<string, { result: string; type?: string; error?: string }>;
+}
+
 // Output from the debuggee
 export interface ProgramOutputEvent extends BaseEvent {
   type: "program_output";
@@ -166,5 +207,8 @@ export type DebugEvent =
   | ExceptionBreakpointSetEvent
   | LogpointHitEvent
   | StepCompletedEvent
+  | TraceStartedEvent
+  | TraceStepEvent
+  | TraceCompletedEvent
   | ProgramOutputEvent
   | ErrorEvent;

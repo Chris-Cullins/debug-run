@@ -21,6 +21,10 @@ import type {
   BreakpointHitEvent,
   ExceptionThrownEvent,
   StepCompletedEvent,
+  TraceStartedEvent,
+  TraceStepEvent,
+  TraceCompletedEvent,
+  TraceStopReason,
 } from "../output/events.js";
 import { BreakpointManager } from "./breakpoints.js";
 import { VariableInspector } from "./variables.js";
@@ -45,6 +49,14 @@ export interface SessionConfig {
   attach?: boolean;
   /** Process ID to attach to */
   pid?: number;
+  /** Enable trace mode - step through code after breakpoint hit */
+  trace?: boolean;
+  /** Use stepIn instead of stepOver in trace mode */
+  traceInto?: boolean;
+  /** Maximum steps in trace mode before stopping (default: 500) */
+  traceLimit?: number;
+  /** Stop trace when this expression evaluates to truthy */
+  traceUntil?: string;
 }
 
 type SessionState =
@@ -74,6 +86,15 @@ export class DebugSession {
   private remainingSteps: number = 0;
   /** Whether we are currently in stepping mode */
   private isStepping: boolean = false;
+
+  /** Whether we are currently in trace mode */
+  private isTracing: boolean = false;
+  /** Number of steps executed in current trace */
+  private traceStepCount: number = 0;
+  /** Path of locations visited during trace */
+  private tracePath: SourceLocation[] = [];
+  /** Initial stack depth when trace started (to detect function return) */
+  private traceInitialStackDepth: number = 0;
 
   private sessionPromise: Promise<void> | null = null;
   private sessionResolve: (() => void) | null = null;
@@ -297,7 +318,19 @@ export class DebugSession {
         );
       }
 
-      // Handle step completion
+      // Handle trace step
+      if (reason === "step" && this.isTracing) {
+        await this.handleTraceStep(
+          threadId,
+          location,
+          stackResponse.stackFrames.length,
+          stackTrace,
+          topFrame?.id
+        );
+        return;
+      }
+
+      // Handle step completion (non-trace stepping)
       if (reason === "step" && this.isStepping) {
         this.stepsExecuted++;
         this.remainingSteps--;
@@ -329,9 +362,14 @@ export class DebugSession {
         return;
       }
 
-      // Emit appropriate event for non-step stops
+      // Handle exception
       if (reason === "exception") {
         this.exceptionsCaught++;
+
+        // If tracing, end the trace first with exception reason
+        if (this.isTracing) {
+          await this.endTrace(threadId, "exception", stackTrace, topFrame?.id);
+        }
 
         const event: ExceptionThrownEvent = {
           type: "exception_thrown",
@@ -345,10 +383,23 @@ export class DebugSession {
           locals,
         };
         this.formatter.emit(event);
-      } else {
-        if (reason === "breakpoint") {
-          this.breakpointsHit++;
+
+        // Continue after exception (trace already ended and continued if tracing)
+        if (!this.isTracing) {
+          await this.client!.continue({ threadId });
+          this.state = "running";
         }
+        return;
+      }
+
+      // Handle breakpoint hit
+      if (reason === "breakpoint") {
+        // If tracing and we hit another breakpoint, end the trace first
+        if (this.isTracing) {
+          await this.endTrace(threadId, "breakpoint", stackTrace, topFrame?.id);
+        }
+
+        this.breakpointsHit++;
 
         const event: BreakpointHitEvent = {
           type: "breakpoint_hit",
@@ -361,16 +412,40 @@ export class DebugSession {
           evaluations,
         };
         this.formatter.emit(event);
-      }
 
-      // If steps are configured and we hit a breakpoint, start stepping
-      if (reason === "breakpoint" && this.config.steps && this.config.steps > 0) {
-        this.remainingSteps = this.config.steps;
-        this.isStepping = true;
-        await this.client!.next({ threadId });
+        // Start trace mode if configured (takes precedence over steps)
+        if (this.config.trace) {
+          await this.startTrace(threadId, location, stackResponse.stackFrames.length);
+          return;
+        }
+
+        // If steps are configured, start stepping
+        if (this.config.steps && this.config.steps > 0) {
+          this.remainingSteps = this.config.steps;
+          this.isStepping = true;
+          await this.client!.next({ threadId });
+          this.state = "running";
+          return;
+        }
+
+        // Continue execution after capturing state
+        await this.client!.continue({ threadId });
         this.state = "running";
         return;
       }
+
+      // Handle other stop reasons (emit as breakpoint_hit for compatibility)
+      const event: BreakpointHitEvent = {
+        type: "breakpoint_hit",
+        timestamp: new Date().toISOString(),
+        id: body.hitBreakpointIds?.[0],
+        threadId,
+        location,
+        stackTrace,
+        locals,
+        evaluations,
+      };
+      this.formatter.emit(event);
 
       // Continue execution after capturing state
       await this.client!.continue({ threadId });
@@ -476,5 +551,199 @@ export class DebugSession {
         // Ignore cleanup errors
       }
     }
+  }
+
+  // ========== Trace Mode Methods ==========
+
+  /**
+   * Start trace mode after hitting a breakpoint
+   */
+  private async startTrace(
+    threadId: number,
+    location: SourceLocation,
+    stackDepth: number
+  ): Promise<void> {
+    this.isTracing = true;
+    this.traceStepCount = 0;
+    this.tracePath = [location];
+    this.traceInitialStackDepth = stackDepth;
+
+    const event: TraceStartedEvent = {
+      type: "trace_started",
+      timestamp: new Date().toISOString(),
+      threadId,
+      startLocation: location,
+      initialStackDepth: stackDepth,
+      traceConfig: {
+        stepInto: this.config.traceInto ?? false,
+        limit: this.config.traceLimit ?? 500,
+        untilExpression: this.config.traceUntil,
+      },
+    };
+    this.formatter.emit(event);
+
+    // Begin stepping
+    if (this.config.traceInto) {
+      await this.client!.stepIn({ threadId });
+    } else {
+      await this.client!.next({ threadId });
+    }
+    this.state = "running";
+  }
+
+  /**
+   * Handle a step during trace mode
+   */
+  private async handleTraceStep(
+    threadId: number,
+    location: SourceLocation,
+    stackDepth: number,
+    stackFrames: StackFrameInfo[],
+    frameId?: number
+  ): Promise<void> {
+    this.traceStepCount++;
+    this.tracePath.push(location);
+
+    // Emit lightweight trace_step event
+    const stepEvent: TraceStepEvent = {
+      type: "trace_step",
+      timestamp: new Date().toISOString(),
+      threadId,
+      stepNumber: this.traceStepCount,
+      location,
+      stackDepth,
+    };
+    this.formatter.emit(stepEvent);
+
+    // Check stop conditions
+    const stopReason = await this.checkTraceStopConditions(
+      stackDepth,
+      frameId
+    );
+
+    if (stopReason) {
+      await this.endTrace(threadId, stopReason, stackFrames, frameId);
+      return;
+    }
+
+    // Continue stepping
+    if (this.config.traceInto) {
+      await this.client!.stepIn({ threadId });
+    } else {
+      await this.client!.next({ threadId });
+    }
+    this.state = "running";
+  }
+
+  /**
+   * Check if any trace stop conditions are met
+   */
+  private async checkTraceStopConditions(
+    currentStackDepth: number,
+    frameId?: number
+  ): Promise<TraceStopReason | null> {
+    const limit = this.config.traceLimit ?? 500;
+
+    // Check 1: Limit reached
+    if (this.traceStepCount >= limit) {
+      return "limit_reached";
+    }
+
+    // Check 2: Function return (stepped out of initial function)
+    if (currentStackDepth < this.traceInitialStackDepth) {
+      return "function_return";
+    }
+
+    // Check 3: --trace-until expression
+    if (this.config.traceUntil && frameId) {
+      try {
+        const result = await this.client!.evaluate({
+          expression: this.config.traceUntil,
+          frameId,
+          context: "watch",
+        });
+        if (this.isTruthy(result.result)) {
+          return "expression_true";
+        }
+      } catch {
+        // Expression evaluation failed - continue tracing
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * End trace mode and emit trace_completed event
+   */
+  private async endTrace(
+    threadId: number,
+    reason: TraceStopReason,
+    stackFrames: StackFrameInfo[],
+    frameId?: number
+  ): Promise<void> {
+    this.isTracing = false;
+
+    const finalLocation = this.tracePath[this.tracePath.length - 1] ?? {
+      file: "unknown",
+      line: 0,
+    };
+
+    // Capture full locals at trace completion
+    let locals: Record<string, VariableValue> = {};
+    if (frameId && this.config.captureLocals !== false) {
+      locals = await this.variableInspector!.getLocals(frameId);
+    }
+
+    // Run evaluations at trace completion
+    let evaluations: Record<string, { result: string; type?: string; error?: string }> | undefined;
+    if (this.config.evaluations?.length && frameId) {
+      evaluations = await this.variableInspector!.evaluateExpressions(
+        frameId,
+        this.config.evaluations
+      );
+    }
+
+    const event: TraceCompletedEvent = {
+      type: "trace_completed",
+      timestamp: new Date().toISOString(),
+      threadId,
+      stopReason: reason,
+      stepsExecuted: this.traceStepCount,
+      path: this.tracePath,
+      finalLocation,
+      stackTrace: stackFrames,
+      locals,
+      evaluations,
+    };
+    this.formatter.emit(event);
+
+    // Update session statistics
+    this.stepsExecuted += this.traceStepCount;
+
+    // Reset trace state
+    this.traceStepCount = 0;
+    this.tracePath = [];
+    this.traceInitialStackDepth = 0;
+
+    // Continue execution after trace
+    await this.client!.continue({ threadId });
+    this.state = "running";
+  }
+
+  /**
+   * Check if a value is truthy
+   */
+  private isTruthy(value: string): boolean {
+    const lower = value.toLowerCase();
+    if (lower === "true") return true;
+    if (lower === "false" || lower === "null" || lower === "undefined" || lower === "none" || lower === "nil") {
+      return false;
+    }
+    // Non-zero numbers are truthy
+    const num = parseFloat(value);
+    if (!isNaN(num)) return num !== 0;
+    // Non-empty strings are truthy (but not empty string representations)
+    return value.length > 0 && value !== '""' && value !== "''";
   }
 }
