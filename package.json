@@ -3,15 +3,14 @@
   "version": "0.1.0",
   "description": "CLI tool enabling AI agents to programmatically debug code via DAP",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
   "bin": {
-    "debug-run": "dist/index.js"
+    "debug-run": "dist/index.cjs"
   },
   "scripts": {
     "prepare": "npm run build",
-    "build": "bun build ./src/index.ts --outdir ./dist --target node",
-    "compile": "bun build --compile ./src/index.ts --outfile debug-run",
-    "dev": "bun run ./src/index.ts",
+    "build": "node scripts/build.mjs",
+    "dev": "tsx ./src/index.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "typecheck": "tsc --noEmit"
