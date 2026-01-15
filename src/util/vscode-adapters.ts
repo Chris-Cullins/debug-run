@@ -203,6 +203,44 @@ export function findCodeLLDB(): string | null {
 }
 
 /**
+ * Find js-debug (VS Code's JavaScript/Node.js debugger)
+ */
+export function findJsDebug(): string | null {
+  // js-debug is a built-in VS Code extension, but can also be installed standalone
+  // Check for the ms-vscode.js-debug extension
+  const jsDebugExt = findExtension("ms-vscode.js-debug");
+  if (jsDebugExt) {
+    const possiblePaths = [
+      path.join(jsDebugExt, "src", "dapDebugServer.js"),
+      path.join(jsDebugExt, "dist", "dapDebugServer.js"),
+    ];
+
+    for (const p of possiblePaths) {
+      if (existsSync(p)) {
+        return p;
+      }
+    }
+  }
+
+  // Also check for the nightly version
+  const jsDebugNightly = findExtension("ms-vscode.js-debug-nightly");
+  if (jsDebugNightly) {
+    const possiblePaths = [
+      path.join(jsDebugNightly, "src", "dapDebugServer.js"),
+      path.join(jsDebugNightly, "dist", "dapDebugServer.js"),
+    ];
+
+    for (const p of possiblePaths) {
+      if (existsSync(p)) {
+        return p;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Summary of all detected VS Code adapters
  */
 export function detectVSCodeAdapters(): Record<string, string | null> {
@@ -210,5 +248,6 @@ export function detectVSCodeAdapters(): Record<string, string | null> {
     vsdbg: findVsdbg(),
     debugpy: findDebugpy(),
     codelldb: findCodeLLDB(),
+    jsDebug: findJsDebug(),
   };
 }

@@ -8,12 +8,16 @@ export * from "./base.js";
 export * from "./netcoredbg.js";
 export * from "./vsdbg.js";
 export * from "./debugpy.js";
+export * from "./node.js";
+export * from "./lldb.js";
 
 import * as path from "node:path";
 import type { AdapterConfig, LaunchOptions, AttachOptions } from "./base.js";
 import { netcoredbgAdapter } from "./netcoredbg.js";
 import { vsdbgAdapter } from "./vsdbg.js";
 import { debugpyAdapter } from "./debugpy.js";
+import { nodeAdapter } from "./node.js";
+import { lldbAdapter } from "./lldb.js";
 import { findVsdbg } from "../util/vscode-adapters.js";
 import { isNetcoredbgInstalled, getNetcoredbgPath } from "../util/adapter-installer.js";
 import { commandExists } from "./base.js";
@@ -122,6 +126,19 @@ const adapters: Map<string, AdapterConfig> = new Map([
   // Python
   ["debugpy", debugpyAdapter],
   ["python", debugpyAdapter],
+
+  // Node.js / JavaScript
+  ["node", nodeAdapter],
+  ["nodejs", nodeAdapter],
+  ["javascript", nodeAdapter],
+  ["js", nodeAdapter],
+
+  // LLDB (C/C++/Rust/Swift)
+  ["lldb", lldbAdapter],
+  ["codelldb", lldbAdapter],
+  ["cpp", lldbAdapter],
+  ["c", lldbAdapter],
+  ["rust", lldbAdapter],
 ]);
 
 /**

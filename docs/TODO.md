@@ -86,15 +86,15 @@ A CLI tool that enables AI agents to programmatically debug code via the Debug A
 - [x] Handle `--capture-each-step` flag
 - [x] Output `step_completed` events
 
-## Phase 5: Multi-Adapter Support
+## Phase 5: Multi-Adapter Support ✅
 
 **Goal:** Support Python, Node.js, and other languages.
 
 - [x] Create adapter abstraction layer (`src/adapters/base.ts`)
 - [x] Implement adapter registry (`src/adapters/index.ts`)
 - [x] Add debugpy adapter for Python (`src/adapters/debugpy.ts`)
-- [ ] Add Node.js inspector adapter (`src/adapters/node.ts`)
-- [ ] Add LLDB adapter (`src/adapters/lldb.ts`)
+- [x] Add Node.js inspector adapter (`src/adapters/node.ts`)
+- [x] Add LLDB adapter (`src/adapters/lldb.ts`)
 - [x] Implement adapter auto-detection
 - [x] Provide installation guidance when adapter missing
 
