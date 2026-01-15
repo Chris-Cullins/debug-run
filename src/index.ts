@@ -8,5 +8,7 @@
  * that agents can parse and act on.
  */
 
-console.log("debug-run - DAP-based debugging for AI agents");
-console.log("Coming soon...");
+import { createCli } from "./cli.js";
+
+const cli = createCli();
+cli.parse();

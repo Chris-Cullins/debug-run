@@ -6,69 +6,69 @@ A CLI tool that enables AI agents to programmatically debug code via the Debug A
 
 - [x] Create project structure
 - [x] Initialize git repository
-- [ ] Initialize Bun/TypeScript project
-- [ ] Configure TypeScript (`tsconfig.json`)
-- [ ] Add dependencies (`@vscode/debugprotocol`, `commander`, `glob`, `chalk`)
+- [x] Initialize Bun/TypeScript project
+- [x] Configure TypeScript (`tsconfig.json`)
+- [x] Add dependencies (`@vscode/debugprotocol`, `commander`, `glob`, `chalk`)
 - [ ] Set up Vitest for testing
 
-## Phase 1: Core DAP Client (MVP)
+## Phase 1: Core DAP Client (MVP) ✅
 
 **Goal:** Connect to netcoredbg, set breakpoints, capture state when hit.
 
 ### Transport Layer
-- [ ] Implement Content-Length framing parser (`src/dap/transport.ts`)
-- [ ] Handle stdin/stdout communication with debug adapter
-- [ ] Implement request/response correlation via sequence numbers
-- [ ] Set up event handling and dispatch
+- [x] Implement Content-Length framing parser (`src/dap/transport.ts`)
+- [x] Handle stdin/stdout communication with debug adapter
+- [x] Implement request/response correlation via sequence numbers
+- [x] Set up event handling and dispatch
 
 ### Session Management
-- [ ] Create session manager (`src/session/manager.ts`)
-- [ ] Implement DAP initialize sequence
-- [ ] Implement launch configuration
-- [ ] Handle `stopped`, `terminated`, `exited`, `output` events
+- [x] Create session manager (`src/session/manager.ts`)
+- [x] Implement DAP initialize sequence
+- [x] Implement launch configuration
+- [x] Handle `stopped`, `terminated`, `exited`, `output` events
 
 ### Breakpoints
-- [ ] Parse breakpoint specification (file:line format)
-- [ ] Implement `setBreakpoints` DAP request
-- [ ] Track breakpoint verification status
+- [x] Parse breakpoint specification (file:line format)
+- [x] Implement `setBreakpoints` DAP request
+- [x] Track breakpoint verification status
 
 ### Variable Inspection
-- [ ] Implement `stackTrace` request
-- [ ] Implement `scopes` request
-- [ ] Implement `variables` request (1 level deep)
+- [x] Implement `stackTrace` request
+- [x] Implement `scopes` request
+- [x] Implement `variables` request (configurable depth)
 
 ### Output
-- [ ] Define event types (`src/output/events.ts`)
-- [ ] Implement NDJSON serializer
-- [ ] Output `session_start`, `breakpoint_set`, `breakpoint_hit`, `session_end` events
+- [x] Define event types (`src/output/events.ts`)
+- [x] Implement NDJSON serializer
+- [x] Output `session_start`, `breakpoint_set`, `breakpoint_hit`, `session_end` events
 
 ### CLI
-- [ ] Set up argument parsing with Commander (`src/cli.ts`)
-- [ ] Handle `--adapter`, `--program`, `--breakpoint`, `--timeout` flags
-- [ ] Implement timeout handling
+- [x] Set up argument parsing with Commander (`src/cli.ts`)
+- [x] Handle `--adapter`, `--program`, `--breakpoint`, `--timeout` flags
+- [x] Implement timeout handling
 
 ### First Adapter
-- [ ] Implement netcoredbg adapter config (`src/adapters/netcoredbg.ts`)
-- [ ] Adapter detection (check if installed)
-- [ ] Build launch/attach configurations
+- [x] Implement netcoredbg adapter config (`src/adapters/netcoredbg.ts`)
+- [x] Adapter detection (check if installed)
+- [x] Build launch/attach configurations
 
 ## Phase 2: Variable Expansion & Evaluation
 
 **Goal:** Deep variable inspection and expression evaluation.
 
-- [ ] Implement recursive variable expansion (configurable depth)
-- [ ] Add collection preview (first N items)
-- [ ] Implement `evaluate` DAP request for expression evaluation
-- [ ] Handle `--eval` CLI flag
-- [ ] Capture `this` context
+- [x] Implement recursive variable expansion (configurable depth)
+- [x] Add collection preview (first N items)
+- [x] Implement `evaluate` DAP request for expression evaluation
+- [x] Handle `--eval` CLI flag
+- [x] Capture `this` context
 - [ ] Handle circular references in variable expansion
 
 ## Phase 3: Conditional Breakpoints & Exceptions
 
 **Goal:** More control over when to break.
 
-- [ ] Support conditional breakpoints (`file:line?condition` syntax)
-- [ ] Support hit count breakpoints
+- [x] Support conditional breakpoints (`file:line?condition` syntax)
+- [x] Support hit count breakpoints (`file:line#count` syntax)
 - [ ] Implement `setExceptionBreakpoints` DAP request
 - [ ] Handle `--break-on-exception` CLI flag
 - [ ] Support caught vs uncaught exception filtering
@@ -78,10 +78,10 @@ A CLI tool that enables AI agents to programmatically debug code via the Debug A
 
 **Goal:** Step through code, not just stop at breakpoints.
 
-- [ ] Implement `next` (step over) DAP request
-- [ ] Implement `stepIn` DAP request
-- [ ] Implement `stepOut` DAP request
-- [ ] Implement `continue` DAP request
+- [x] Implement `next` (step over) DAP request
+- [x] Implement `stepIn` DAP request
+- [x] Implement `stepOut` DAP request
+- [x] Implement `continue` DAP request
 - [ ] Handle `--steps N` CLI flag for automatic stepping
 - [ ] Handle `--capture-each-step` flag
 - [ ] Output `step_completed` events
@@ -90,13 +90,13 @@ A CLI tool that enables AI agents to programmatically debug code via the Debug A
 
 **Goal:** Support Python, Node.js, and other languages.
 
-- [ ] Create adapter abstraction layer (`src/adapters/base.ts`)
-- [ ] Implement adapter registry (`src/adapters/index.ts`)
-- [ ] Add debugpy adapter for Python (`src/adapters/debugpy.ts`)
+- [x] Create adapter abstraction layer (`src/adapters/base.ts`)
+- [x] Implement adapter registry (`src/adapters/index.ts`)
+- [x] Add debugpy adapter for Python (`src/adapters/debugpy.ts`)
 - [ ] Add Node.js inspector adapter (`src/adapters/node.ts`)
 - [ ] Add LLDB adapter (`src/adapters/lldb.ts`)
-- [ ] Implement adapter auto-detection
-- [ ] Provide installation guidance when adapter missing
+- [x] Implement adapter auto-detection
+- [x] Provide installation guidance when adapter missing
 
 ## Phase 6: Test Integration
 
@@ -142,7 +142,7 @@ A CLI tool that enables AI agents to programmatically debug code via the Debug A
 
 ### Documentation
 - [ ] Write README.md with usage examples
-- [ ] Document adapter installation (`adapters/README.md`)
+- [x] Document adapter installation (`adapters/README.md`)
 - [ ] Add agent integration examples
 
 ### Distribution
