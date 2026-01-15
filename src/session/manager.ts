@@ -20,6 +20,7 @@ import type {
   VariableValue,
   BreakpointHitEvent,
   ExceptionThrownEvent,
+  StepCompletedEvent,
 } from "../output/events.js";
 import { BreakpointManager } from "./breakpoints.js";
 import { VariableInspector } from "./variables.js";
@@ -36,6 +37,10 @@ export interface SessionConfig {
   evaluations?: string[];
   timeout?: number;
   captureLocals?: boolean;
+  /** Number of steps to execute after hitting a breakpoint */
+  steps?: number;
+  /** Whether to capture variables at each step */
+  captureEachStep?: boolean;
 }
 
 type SessionState =
@@ -60,6 +65,11 @@ export class DebugSession {
   private breakpointsHit: number = 0;
   private exceptionsCaught: number = 0;
   private stepsExecuted: number = 0;
+
+  /** Remaining steps to execute after the current breakpoint */
+  private remainingSteps: number = 0;
+  /** Whether we are currently in stepping mode */
+  private isStepping: boolean = false;
 
   private sessionPromise: Promise<void> | null = null;
   private sessionResolve: (() => void) | null = null;
@@ -256,7 +266,39 @@ export class DebugSession {
         );
       }
 
-      // Emit appropriate event
+      // Handle step completion
+      if (reason === "step" && this.isStepping) {
+        this.stepsExecuted++;
+        this.remainingSteps--;
+
+        // Emit step_completed event if capturing each step
+        if (this.config.captureEachStep) {
+          const event: StepCompletedEvent = {
+            type: "step_completed",
+            timestamp: new Date().toISOString(),
+            threadId,
+            location,
+            stackTrace,
+            locals,
+          };
+          this.formatter.emit(event);
+        }
+
+        // If more steps remain, continue stepping
+        if (this.remainingSteps > 0) {
+          await this.client!.next({ threadId });
+          this.state = "running";
+          return;
+        }
+
+        // Done stepping, continue execution
+        this.isStepping = false;
+        await this.client!.continue({ threadId });
+        this.state = "running";
+        return;
+      }
+
+      // Emit appropriate event for non-step stops
       if (reason === "exception") {
         this.exceptionsCaught++;
 
@@ -288,6 +330,15 @@ export class DebugSession {
           evaluations,
         };
         this.formatter.emit(event);
+      }
+
+      // If steps are configured and we hit a breakpoint, start stepping
+      if (reason === "breakpoint" && this.config.steps && this.config.steps > 0) {
+        this.remainingSteps = this.config.steps;
+        this.isStepping = true;
+        await this.client!.next({ threadId });
+        this.state = "running";
+        return;
       }
 
       // Continue execution after capturing state

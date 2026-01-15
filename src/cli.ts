@@ -22,6 +22,8 @@ export interface CliOptions {
   timeout?: string;
   captureLocals?: boolean;
   pretty?: boolean;
+  steps?: number;
+  captureEachStep?: boolean;
 }
 
 function parseTimeout(value: string): number {
@@ -89,6 +91,16 @@ export function createCli(): Command {
     .option("--capture-locals", "Capture local variables at breakpoints", true)
     .option("--no-capture-locals", "Disable capturing local variables")
     .option("--pretty", "Pretty print JSON output", false)
+    .option(
+      "-s, --steps <count>",
+      "Number of steps to execute after hitting a breakpoint (step over)",
+      (val: string) => parseInt(val, 10)
+    )
+    .option(
+      "--capture-each-step",
+      "Capture variables and location at each step",
+      false
+    )
     .addOption(
       new Option("--env <key=value...>", "Environment variables for the program")
     )
@@ -194,6 +206,8 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
       evaluations: options.eval.length > 0 ? options.eval : undefined,
       timeout,
       captureLocals: options.captureLocals,
+      steps: options.steps,
+      captureEachStep: options.captureEachStep,
     },
     formatter
   );

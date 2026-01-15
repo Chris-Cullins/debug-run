@@ -74,7 +74,7 @@ A CLI tool that enables AI agents to programmatically debug code via the Debug A
 - [x] Support caught vs uncaught exception filtering
 - [x] Implement logpoints (log without breaking)
 
-## Phase 4: Stepping & Flow Control
+## Phase 4: Stepping & Flow Control ✅
 
 **Goal:** Step through code, not just stop at breakpoints.
 
@@ -82,9 +82,9 @@ A CLI tool that enables AI agents to programmatically debug code via the Debug A
 - [x] Implement `stepIn` DAP request
 - [x] Implement `stepOut` DAP request
 - [x] Implement `continue` DAP request
-- [ ] Handle `--steps N` CLI flag for automatic stepping
-- [ ] Handle `--capture-each-step` flag
-- [ ] Output `step_completed` events
+- [x] Handle `--steps N` CLI flag for automatic stepping
+- [x] Handle `--capture-each-step` flag
+- [x] Output `step_completed` events
 
 ## Phase 5: Multi-Adapter Support
 
