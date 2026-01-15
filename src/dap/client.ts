@@ -7,7 +7,9 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { DapTransport } from "./transport.js";
+import { signHandshake } from "../util/vsda-signer.js";
 import type {
+  Request,
   InitializeRequestArguments,
   InitializeResponse,
   LaunchRequestArguments,
@@ -119,17 +121,79 @@ export class DapClient extends EventEmitter {
     this.transport.on("error", (error: Error) => {
       this.emit("error", error);
     });
+
+    // Handle vsdbg handshake reverse request
+    this.transport.on("reverseRequest:handshake", (request: Request) => {
+      this.handleHandshakeRequest(request);
+    });
+  }
+
+  /**
+   * Handle vsdbg handshake authentication request
+   */
+  private handleHandshakeRequest(request: Request): void {
+    const args = request.arguments as { value?: string } | undefined;
+    const challenge = args?.value;
+
+    if (!challenge) {
+      this.sendReverseResponse(request, false, "No challenge value provided");
+      return;
+    }
+
+    const signature = signHandshake(challenge);
+    if (signature) {
+      this.sendReverseResponse(request, true, undefined, { signature });
+    } else {
+      // If we can't sign, send empty response - vsdbg may still work
+      this.sendReverseResponse(request, true, undefined, { signature: "" });
+    }
+  }
+
+  /**
+   * Send a response to a reverse request from the adapter
+   */
+  private sendReverseResponse(
+    request: Request,
+    success: boolean,
+    message?: string,
+    body?: unknown
+  ): void {
+    if (!this.transport) return;
+
+    const response = {
+      seq: 0, // Will be set by transport
+      type: "response" as const,
+      request_seq: request.seq,
+      command: request.command,
+      success,
+      message,
+      body,
+    };
+
+    this.transport.send(response);
   }
 
   /**
    * Initialize the debug session
+   *
+   * After the initialize response, waits for the 'initialized' event from the adapter
+   * before returning, as required by the DAP protocol.
    */
   async initialize(args: Partial<InitializeRequestArguments> = {}): Promise<Capabilities> {
     this.ensureConnected();
 
+    // Set up listener for initialized event BEFORE sending request
+    // (the event may arrive immediately after the response)
+    let initializedResolve: () => void;
+    const initializedPromise = new Promise<void>((resolve) => {
+      initializedResolve = resolve;
+    });
+    this.once("initialized", () => initializedResolve());
+
     const response = await this.transport!.sendRequest<InitializeResponse>("initialize", {
-      clientID: "debug-run",
-      clientName: "debug-run",
+      // Use VS Code identity for vsdbg compatibility
+      clientID: "vscode",
+      clientName: "Visual Studio Code",
       adapterID: args.adapterID || "unknown",
       pathFormat: "path",
       linesStartAt1: true,
@@ -141,6 +205,18 @@ export class DapClient extends EventEmitter {
     });
 
     this.capabilities = response?.capabilities || response || {};
+
+    // Wait for the initialized event (with a timeout to handle adapters that don't send it)
+    const timeoutPromise = new Promise<void>((_, reject) => {
+      setTimeout(() => reject(new Error("Timeout waiting for initialized event")), 10000);
+    });
+
+    try {
+      await Promise.race([initializedPromise, timeoutPromise]);
+    } catch {
+      // Some adapters may not send initialized event, continue anyway
+    }
+
     this.initialized = true;
     return this.capabilities;
   }

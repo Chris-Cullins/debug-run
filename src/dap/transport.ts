@@ -124,7 +124,10 @@ export class DapTransport extends EventEmitter {
     return !this.closed;
   }
 
-  private send(message: ProtocolMessage): void {
+  /**
+   * Send a message to the debug adapter (used for reverse request responses)
+   */
+  send(message: ProtocolMessage): void {
     if (this.closed || !this.process.stdin?.writable) {
       return;
     }
@@ -194,8 +197,9 @@ export class DapTransport extends EventEmitter {
         this.handleEvent(message as Event);
         break;
       case "request":
-        // Reverse requests from adapter (e.g., runInTerminal)
+        // Reverse requests from adapter (e.g., runInTerminal, handshake)
         this.emit("reverseRequest", message as Request);
+        this.emit(`reverseRequest:${(message as Request).command}`, message as Request);
         break;
     }
   }
