@@ -8,6 +8,7 @@ import { Command, Option } from "commander";
 import { getAdapter, getAdapterNames } from "./adapters/index.js";
 import { DebugSession } from "./session/manager.js";
 import { OutputFormatter } from "./output/formatter.js";
+import { installNetcoredbg, isNetcoredbgInstalled, getNetcoredbgPath } from "./util/adapter-installer.js";
 
 export interface CliOptions {
   adapter: string;
@@ -103,6 +104,14 @@ export function createCli(): Command {
       await listAdapters();
     });
 
+  // Add install-adapter subcommand
+  program
+    .command("install-adapter <name>")
+    .description("Download and install a debug adapter")
+    .action(async (name: string) => {
+      await installAdapter(name);
+    });
+
   return program;
 }
 
@@ -183,5 +192,34 @@ async function listAdapters(): Promise<void> {
     console.log(`    ID: ${adapter.id}`);
     console.log(`    Status: ${status}`);
     console.log();
+  }
+}
+
+async function installAdapter(name: string): Promise<void> {
+  const normalizedName = name.toLowerCase();
+
+  if (normalizedName === "netcoredbg" || normalizedName === "coreclr" || normalizedName === "dotnet") {
+    if (isNetcoredbgInstalled()) {
+      console.log(`netcoredbg is already installed at: ${getNetcoredbgPath()}`);
+      return;
+    }
+
+    try {
+      const installedPath = await installNetcoredbg((msg) => console.log(msg));
+      console.log(`\nSuccessfully installed netcoredbg!`);
+      console.log(`Path: ${installedPath}`);
+    } catch (error) {
+      console.error(`Failed to install netcoredbg: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  } else if (normalizedName === "debugpy" || normalizedName === "python") {
+    console.log("debugpy should be installed via pip:");
+    console.log("  pip install debugpy");
+    console.log("\nOr:");
+    console.log("  pip3 install debugpy");
+  } else {
+    console.error(`Unknown adapter: ${name}`);
+    console.error(`Available adapters: ${getAdapterNames().join(", ")}`);
+    process.exit(1);
   }
 }

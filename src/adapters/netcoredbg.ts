@@ -8,19 +8,45 @@
 import * as path from "node:path";
 import type { AdapterConfig, LaunchOptions, AttachOptions } from "./base.js";
 import { commandExists } from "./base.js";
+import { getNetcoredbgPath, isNetcoredbgInstalled } from "../util/adapter-installer.js";
+
+/**
+ * Find the netcoredbg executable, checking bundled location first
+ */
+async function findNetcoredbg(): Promise<string | null> {
+  // Check bundled location first
+  if (isNetcoredbgInstalled()) {
+    return getNetcoredbgPath();
+  }
+
+  // Fall back to system PATH
+  return await commandExists("netcoredbg");
+}
+
+// Cache the detected path
+let cachedPath: string | null = null;
 
 export const netcoredbgAdapter: AdapterConfig = {
   id: "coreclr",
   name: "netcoredbg",
-  command: "netcoredbg",
+
+  // This will be updated by detect()
+  get command() {
+    return cachedPath || "netcoredbg";
+  },
+
   args: ["--interpreter=vscode"],
 
   detect: async () => {
-    return await commandExists("netcoredbg");
+    cachedPath = await findNetcoredbg();
+    return cachedPath;
   },
 
   installHint: `
 Install netcoredbg:
+
+  Auto-install (recommended):
+    debug-run install-adapter netcoredbg
 
   Ubuntu/Debian:
     apt install netcoredbg
