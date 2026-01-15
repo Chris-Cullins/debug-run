@@ -39,3 +39,7 @@ npm-debug.log*
 # Sample app build outputs
 samples/dotnet/bin/
 samples/dotnet/obj/
+
+# Debugger history files
+.netcoredbg_hist
+*.dbg_hist
