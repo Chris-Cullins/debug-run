@@ -5,14 +5,14 @@ A CLI tool that enables AI agents to programmatically debug code via the Debug A
 ## Quick Start
 
 ```bash
-# Install dependencies
+# Install dependencies (automatically builds)
 npm install
 
-# Run the CLI (using tsx for development)
-npx tsx ./src/index.ts --help
+# Run the CLI
+npx debug-run --help
 
 # List available debug adapters
-npx tsx ./src/index.ts list-adapters
+npx debug-run list-adapters
 ```
 
 ## Building the Sample .NET App
@@ -32,7 +32,7 @@ This creates `samples/dotnet/bin/Debug/net8.0/SampleApp.dll`.
 ### Basic Debugging (breakpoint + variable capture)
 
 ```bash
-npx tsx ./src/index.ts ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   --pretty \
@@ -49,7 +49,7 @@ This will:
 Use `--eval` or `-e` to evaluate expressions at each breakpoint:
 
 ```bash
-npx tsx ./src/index.ts ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   -e "order.Total" \
@@ -81,7 +81,7 @@ The tool outputs NDJSON (newline-delimited JSON) events:
 The VS Code C# extension's debugger. Automatically detected if you have the C# extension installed.
 
 ```bash
-npx tsx ./src/index.ts list-adapters
+npx debug-run list-adapters
 # Should show: vsdbg - Status: installed (path)
 ```
 
@@ -93,7 +93,7 @@ Install manually from: https://github.com/Samsung/netcoredbg/releases
 
 Or use the built-in installer:
 ```bash
-npx tsx ./src/index.ts install-adapter netcoredbg
+npx debug-run install-adapter netcoredbg
 ```
 
 ### debugpy (Python)
@@ -144,7 +144,7 @@ The following Phase 2 features are implemented:
 
 ### "Adapter not installed"
 
-Run `npx tsx ./src/index.ts list-adapters` to see what's available.
+Run `npx debug-run list-adapters` to see what's available.
 
 ### Breakpoint not hitting
 
@@ -173,7 +173,7 @@ cd samples/aspnet/SampleApi && dotnet run
 # Output: SampleApi starting... PID: 12345
 
 # Attach debug-run
-npx tsx ./src/index.ts --attach --pid 12345 \
+npx debug-run --attach --pid 12345 \
   -a vsdbg \
   -b "samples/aspnet/SampleApi/Program.cs:16" \
   -e "svc._orders.Count" \
