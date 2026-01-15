@@ -108,12 +108,13 @@ A CLI tool that enables AI agents to programmatically debug code via the Debug A
 - [ ] Support jest/vitest integration
 - [ ] Automatic breakpoint on test failure
 
-## Phase 7: Attach & Advanced Scenarios
+## Phase 7: Attach & Advanced Scenarios (In Progress)
 
 **Goal:** Debug running processes and complex scenarios.
 
-- [ ] Implement `--attach` mode
-- [ ] Support attach by PID (`--pid`)
+- [x] Implement `--attach` mode
+- [x] Support attach by PID (`--pid`)
+- [x] Add ASP.NET sample app for attach testing (`samples/aspnet/`)
 - [ ] Support attach by process name
 - [ ] Multi-process debugging
 - [ ] Source mapping for transpiled code
@@ -141,7 +142,7 @@ A CLI tool that enables AI agents to programmatically debug code via the Debug A
 - [ ] End-to-end tests with Node.js inspector
 
 ### Documentation
-- [ ] Write README.md with usage examples
+- [x] Write README.md with usage examples
 - [x] Document adapter installation (`adapters/README.md`)
 - [ ] Add agent integration examples
 
