@@ -9,7 +9,7 @@
  * 2. Expression evaluation (fallback - uses DAP evaluate for deeper inspection)
  */
 
-import type { DapClient } from "../dap/client.js";
+import type { IDapClient } from "../dap/client-interface.js";
 import type { VariableValue } from "../output/events.js";
 
 // ========== Types ==========
@@ -385,7 +385,7 @@ function extractNumberValue(variable: VariableValue): number | undefined {
  * @returns Flattened exception chain with root cause classification
  */
 export async function flattenExceptionChain(
-  client: DapClient,
+  client: IDapClient,
   frameId: number,
   maxDepth: number = 10
 ): Promise<ExceptionChainResult | null> {
@@ -457,7 +457,7 @@ export async function flattenExceptionChain(
  * Safely evaluate an expression, returning null on error
  */
 async function safeEvaluate(
-  client: DapClient,
+  client: IDapClient,
   frameId: number,
   expression: string
 ): Promise<string | null> {
@@ -477,7 +477,7 @@ async function safeEvaluate(
  * Extract the throw site (first meaningful line of stack trace)
  */
 async function extractThrowSite(
-  client: DapClient,
+  client: IDapClient,
   frameId: number,
   exceptionExpr: string
 ): Promise<string | undefined> {
@@ -526,7 +526,7 @@ async function extractThrowSite(
  * Extract additional data from specific exception types
  */
 async function extractExceptionData(
-  client: DapClient,
+  client: IDapClient,
   frameId: number,
   exceptionExpr: string,
   exceptionType: string

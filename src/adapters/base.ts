@@ -21,6 +21,8 @@ export interface AttachOptions {
   port?: number;
 }
 
+export type TransportType = "stdio" | "socket";
+
 export interface AdapterConfig {
   /** DAP adapter ID (e.g., "coreclr", "python") */
   id: string;
@@ -33,6 +35,12 @@ export interface AdapterConfig {
 
   /** Arguments for the command */
   args?: string[];
+
+  /** Transport type: "stdio" (default) or "socket" */
+  transport?: TransportType;
+
+  /** Port for socket transport (required if transport is "socket") */
+  socketPort?: number;
 
   /** Function to detect if the adapter is installed */
   detect: () => Promise<string | null>;

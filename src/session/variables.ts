@@ -4,7 +4,7 @@
  * Handles fetching and expanding variables from the debug adapter.
  */
 
-import type { DapClient } from "../dap/client.js";
+import type { IDapClient } from "../dap/client-interface.js";
 import type { Variable as DapVariable } from "../dap/protocol.js";
 import type { VariableValue, VariableChange } from "../output/events.js";
 
@@ -111,10 +111,10 @@ export interface VariableInspectorOptions {
 }
 
 export class VariableInspector {
-  private client: DapClient;
+  private client: IDapClient;
   private options: Required<VariableInspectorOptions>;
 
-  constructor(client: DapClient, options: VariableInspectorOptions = {}) {
+  constructor(client: IDapClient, options: VariableInspectorOptions = {}) {
     this.client = client;
     this.options = {
       maxDepth: options.maxDepth ?? 2,

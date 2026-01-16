@@ -12,6 +12,8 @@
 
 import type { AdapterConfig } from "../adapters/base.js";
 import { DapClient } from "../dap/client.js";
+import { SocketDapClient } from "../dap/socket-client.js";
+import type { IDapClient } from "../dap/client-interface.js";
 import type { StoppedEventBody, ExitedEventBody, OutputEventBody } from "../dap/protocol.js";
 import { OutputFormatter } from "../output/formatter.js";
 import type {
@@ -87,7 +89,7 @@ type SessionState =
 
 export class DebugSession {
   private config: SessionConfig;
-  private client: DapClient | null = null;
+  private client: IDapClient | null = null;
   private formatter: OutputFormatter;
   private breakpointManager: BreakpointManager | null = null;
   private variableInspector: VariableInspector | null = null;
@@ -176,13 +178,27 @@ export class DebugSession {
   private async start(): Promise<void> {
     // Create and connect DAP client
     this.state = "connecting";
-    this.client = new DapClient({
-      command: this.config.adapter.command,
-      args: this.config.adapter.args,
-      cwd: this.config.cwd,
-      env: this.config.env,
-      timeout: this.config.timeout,
-    });
+
+    if (this.config.adapter.transport === "socket" && this.config.adapter.socketPort) {
+      // Use socket-based client for adapters like js-debug
+      this.client = new SocketDapClient({
+        command: this.config.adapter.command,
+        args: this.config.adapter.args,
+        cwd: this.config.cwd,
+        env: this.config.env,
+        port: this.config.adapter.socketPort,
+        timeout: this.config.timeout,
+      });
+    } else {
+      // Use stdio-based client (default)
+      this.client = new DapClient({
+        command: this.config.adapter.command,
+        args: this.config.adapter.args,
+        cwd: this.config.cwd,
+        env: this.config.env,
+        timeout: this.config.timeout,
+      });
+    }
 
     this.setupEventHandlers();
     await this.client.connect();
@@ -256,10 +272,23 @@ export class DebugSession {
         env: this.config.env,
       });
 
-      await this.client.launch(launchConfig);
+      if (process.env.DEBUG_DAP) {
+        console.error("[Launch config]", JSON.stringify(launchConfig, null, 2));
+      }
 
-      // Signal configuration done
-      await this.client.configurationDone();
+      // Adapter-specific order: js-debug (socket) needs configurationDone before launch,
+      // vsdbg (stdio) needs launch before configurationDone
+      const isSocketAdapter = this.config.adapter.transport === "socket";
+      
+      if (isSocketAdapter) {
+        // js-debug requires configurationDone before launch
+        await this.client.configurationDone();
+        await this.client.launch(launchConfig);
+      } else {
+        // vsdbg requires launch before configurationDone
+        await this.client.launch(launchConfig);
+        await this.client.configurationDone();
+      }
 
       this.state = "running";
       this.formatter.emit(

@@ -9,7 +9,14 @@ import { Command, Option } from "commander";
 import { getAdapter, getAdapterNames } from "./adapters/index.js";
 import { DebugSession } from "./session/manager.js";
 import { OutputFormatter } from "./output/formatter.js";
-import { installNetcoredbg, isNetcoredbgInstalled, getNetcoredbgPath } from "./util/adapter-installer.js";
+import {
+  installNetcoredbg,
+  isNetcoredbgInstalled,
+  getNetcoredbgPath,
+  installJsDebug,
+  isJsDebugInstalled,
+  getJsDebugPath,
+} from "./util/adapter-installer.js";
 import { launchTestRunner, cleanupTestRunner, type TestRunnerResult } from "./util/test-runner.js";
 
 export interface CliOptions {
@@ -485,6 +492,20 @@ async function installAdapter(name: string): Promise<void> {
       console.log(`Path: ${installedPath}`);
     } catch (error) {
       console.error(`Failed to install netcoredbg: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  } else if (normalizedName === "node" || normalizedName === "nodejs" || normalizedName === "js" || normalizedName === "javascript" || normalizedName === "typescript") {
+    if (isJsDebugInstalled()) {
+      console.log(`js-debug is already installed at: ${getJsDebugPath()}`);
+      return;
+    }
+
+    try {
+      const installedPath = await installJsDebug((msg) => console.log(msg));
+      console.log(`\nSuccessfully installed js-debug!`);
+      console.log(`Path: ${installedPath}`);
+    } catch (error) {
+      console.error(`Failed to install js-debug: ${error instanceof Error ? error.message : error}`);
       process.exit(1);
     }
   } else if (normalizedName === "debugpy" || normalizedName === "python") {

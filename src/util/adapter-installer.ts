@@ -19,6 +19,10 @@ const execAsync = promisify(exec);
 const NETCOREDBG_VERSION = "3.1.3-1062";
 const NETCOREDBG_BASE_URL = `https://github.com/Samsung/netcoredbg/releases/download/${NETCOREDBG_VERSION}`;
 
+// js-debug release info
+const JSDEBUG_VERSION = "1.105.0";
+const JSDEBUG_DOWNLOAD_URL = `https://github.com/microsoft/vscode-js-debug/releases/download/v${JSDEBUG_VERSION}/js-debug-dap-v${JSDEBUG_VERSION}.tar.gz`;
+
 interface PlatformInfo {
   os: string;
   arch: string;
@@ -172,4 +176,81 @@ export async function ensureNetcoredbg(
   }
 
   return await installNetcoredbg(onProgress);
+}
+
+// ============================================================================
+// js-debug (Node.js/TypeScript debugger)
+// ============================================================================
+
+/**
+ * Get the path to the js-debug DAP server
+ */
+export function getJsDebugPath(): string {
+  return path.join(getAdaptersDir(), "js-debug", "src", "dapDebugServer.js");
+}
+
+/**
+ * Check if js-debug is installed in the bundled location
+ */
+export function isJsDebugInstalled(): boolean {
+  return existsSync(getJsDebugPath());
+}
+
+/**
+ * Download and install js-debug
+ */
+export async function installJsDebug(
+  onProgress?: (message: string) => void
+): Promise<string> {
+  const log = onProgress ?? console.log;
+  const adaptersDir = getAdaptersDir();
+  const jsDebugDir = path.join(adaptersDir, "js-debug");
+  const archivePath = path.join(os.tmpdir(), "js-debug.tar.gz");
+
+  log(`Downloading js-debug v${JSDEBUG_VERSION} from GitHub...`);
+
+  // Create directories
+  await mkdir(jsDebugDir, { recursive: true });
+
+  // Download the archive
+  const response = await fetch(JSDEBUG_DOWNLOAD_URL);
+  if (!response.ok) {
+    throw new Error(`Failed to download js-debug: ${response.statusText}`);
+  }
+
+  // Save to temp file
+  const fileStream = createWriteStream(archivePath);
+  await pipeline(Readable.fromWeb(response.body as any), fileStream);
+
+  log("Extracting...");
+
+  // Extract the archive - js-debug tarball has a js-debug/ root directory
+  // First remove existing if any
+  if (existsSync(jsDebugDir)) {
+    await rm(jsDebugDir, { recursive: true, force: true });
+  }
+  await mkdir(adaptersDir, { recursive: true });
+
+  // Extract to adapters dir (it will create js-debug/ inside)
+  await execAsync(`tar -xzf "${archivePath}" -C "${adaptersDir}"`);
+
+  // Clean up
+  await rm(archivePath, { force: true });
+
+  const execPath = getJsDebugPath();
+  log(`Installed js-debug to ${execPath}`);
+  return execPath;
+}
+
+/**
+ * Ensure js-debug is installed, downloading if necessary
+ */
+export async function ensureJsDebug(
+  onProgress?: (message: string) => void
+): Promise<string> {
+  if (isJsDebugInstalled()) {
+    return getJsDebugPath();
+  }
+
+  return await installJsDebug(onProgress);
 }

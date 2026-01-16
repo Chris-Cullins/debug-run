@@ -9,14 +9,22 @@ import * as path from "node:path";
 import type { AdapterConfig, LaunchOptions, AttachOptions } from "./base.js";
 import { commandExists } from "./base.js";
 import { findJsDebug } from "../util/vscode-adapters.js";
+import { isJsDebugInstalled, getJsDebugPath } from "../util/adapter-installer.js";
 
 // Cache the detected path and type
 let cachedPath: string | null = null;
 let cachedType: "js-debug" | "node" | null = null;
 
+// Default port for js-debug DAP server
+const JSDEBUG_PORT = 8177;
+
 export const nodeAdapter: AdapterConfig = {
   id: "pwa-node",
   name: "node",
+
+  // js-debug uses socket transport
+  transport: "socket",
+  socketPort: JSDEBUG_PORT,
 
   get command() {
     if (cachedType === "js-debug" && cachedPath) {
@@ -27,13 +35,21 @@ export const nodeAdapter: AdapterConfig = {
 
   get args() {
     if (cachedType === "js-debug" && cachedPath) {
-      return [cachedPath];
+      // js-debug dapDebugServer takes port as first argument
+      return [cachedPath, String(JSDEBUG_PORT)];
     }
     return [];
   },
 
   detect: async () => {
-    // Try to find js-debug from VS Code extension
+    // First, check if js-debug is installed via debug-run installer
+    if (isJsDebugInstalled()) {
+      cachedPath = getJsDebugPath();
+      cachedType = "js-debug";
+      return cachedPath;
+    }
+
+    // Try to find js-debug from VS Code extension (user extensions dir)
     const jsDebugPath = findJsDebug();
     if (jsDebugPath) {
       cachedPath = jsDebugPath;
@@ -57,19 +73,16 @@ export const nodeAdapter: AdapterConfig = {
   installHint: `
 Node.js debugger (js-debug) not found.
 
-Options:
+Install with:
+  debug-run install-adapter node
 
-  1. Install VS Code (recommended):
-     - js-debug is built into VS Code
-     - Install VS Code from https://code.visualstudio.com
+Alternative options:
 
-  2. Install the js-debug extension manually:
-     - Open VS Code
-     - The JavaScript Debugger (ms-vscode.js-debug) is built-in
+  1. Install the js-debug extension in VS Code:
+     - Open VS Code Extensions
+     - Install "JavaScript Debugger (Nightly)" (ms-vscode.js-debug-nightly)
 
-  3. For basic debugging without js-debug:
-     - Ensure Node.js is installed: https://nodejs.org
-     - Note: Some features may be limited without js-debug
+  2. Ensure Node.js is installed: https://nodejs.org
 `.trim(),
 
   launchConfig: (options: LaunchOptions) => ({
@@ -85,6 +98,10 @@ Options:
     // js-debug specific options
     skipFiles: ["<node_internals>/**"],
     resolveSourceMapLocations: ["**", "!**/node_modules/**"],
+    // Disable child process auto-attach to avoid multi-session complexity
+    autoAttachChildProcesses: false,
+    // Wait for source maps to load before running
+    pauseForSourceMap: true,
   }),
 
   attachConfig: (options: AttachOptions) => ({

@@ -1,0 +1,14 @@
+{
+  "name": "sample-typescript-app",
+  "version": "1.0.0",
+  "description": "Sample TypeScript application for testing debug-run",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

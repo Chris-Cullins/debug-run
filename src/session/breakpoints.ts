@@ -5,7 +5,7 @@
  */
 
 import * as path from "node:path";
-import type { DapClient } from "../dap/client.js";
+import type { IDapClient } from "../dap/client-interface.js";
 import type { SourceBreakpoint } from "../dap/protocol.js";
 import type { OutputFormatter } from "../output/formatter.js";
 
@@ -88,12 +88,12 @@ export function parseLogpointSpec(spec: string): BreakpointSpec {
 }
 
 export class BreakpointManager {
-  private client: DapClient;
+  private client: IDapClient;
   private formatter: OutputFormatter;
   private breakpoints: Map<string, TrackedBreakpoint[]> = new Map();
   private nextId: number = 1;
 
-  constructor(client: DapClient, formatter: OutputFormatter) {
+  constructor(client: IDapClient, formatter: OutputFormatter) {
     this.client = client;
     this.formatter = formatter;
   }
