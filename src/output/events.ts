@@ -194,6 +194,18 @@ export interface ErrorEvent extends BaseEvent {
   details?: string;
 }
 
+// Assertion events
+export interface AssertionFailedEvent extends BaseEvent {
+  type: "assertion_failed";
+  threadId: number;
+  assertion: string;
+  actualValue: string;
+  evaluationError?: string;
+  location: SourceLocation;
+  stackTrace: StackFrameInfo[];
+  locals: Record<string, VariableValue>;
+}
+
 // Union type of all events
 export type DebugEvent =
   | SessionStartEvent
@@ -211,4 +223,5 @@ export type DebugEvent =
   | TraceStepEvent
   | TraceCompletedEvent
   | ProgramOutputEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | AssertionFailedEvent;
