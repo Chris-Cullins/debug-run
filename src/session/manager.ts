@@ -18,6 +18,7 @@ import type {
   SourceLocation,
   StackFrameInfo,
   VariableValue,
+  VariableChange,
   BreakpointHitEvent,
   ExceptionThrownEvent,
   StepCompletedEvent,
@@ -59,6 +60,8 @@ export interface SessionConfig {
   traceLimit?: number;
   /** Stop trace when this expression evaluates to truthy */
   traceUntil?: string;
+  /** Show only changed variables in trace steps instead of full dumps */
+  diffVars?: boolean;
 }
 
 type SessionState =
@@ -97,6 +100,8 @@ export class DebugSession {
   private tracePath: SourceLocation[] = [];
   /** Initial stack depth when trace started (to detect function return) */
   private traceInitialStackDepth: number = 0;
+  /** Previous locals for variable diffing (only used when diffVars is enabled) */
+  private previousLocals: Record<string, VariableValue> = {};
 
   private sessionPromise: Promise<void> | null = null;
   private sessionResolve: (() => void) | null = null;
@@ -455,7 +460,7 @@ export class DebugSession {
 
         // Start trace mode if configured (takes precedence over steps)
         if (this.config.trace) {
-          await this.startTrace(threadId, location, stackResponse.stackFrames.length);
+          await this.startTrace(threadId, location, stackResponse.stackFrames.length, topFrame?.id);
           return;
         }
 
@@ -601,12 +606,20 @@ export class DebugSession {
   private async startTrace(
     threadId: number,
     location: SourceLocation,
-    stackDepth: number
+    stackDepth: number,
+    frameId?: number
   ): Promise<void> {
     this.isTracing = true;
     this.traceStepCount = 0;
     this.tracePath = [location];
     this.traceInitialStackDepth = stackDepth;
+
+    // Initialize diff state with current locals if enabled
+    if (this.config.diffVars && frameId) {
+      this.previousLocals = await this.variableInspector!.getLocals(frameId);
+    } else {
+      this.previousLocals = {};
+    }
 
     const event: TraceStartedEvent = {
       type: "trace_started",
@@ -644,7 +657,7 @@ export class DebugSession {
     this.traceStepCount++;
     this.tracePath.push(location);
 
-    // Emit lightweight trace_step event
+    // Build trace_step event
     const stepEvent: TraceStepEvent = {
       type: "trace_step",
       timestamp: new Date().toISOString(),
@@ -653,6 +666,22 @@ export class DebugSession {
       location,
       stackDepth,
     };
+
+    // Compute variable diff if enabled
+    if (this.config.diffVars && frameId) {
+      const currentLocals = await this.variableInspector!.getLocals(frameId);
+      const changes = this.variableInspector!.diffVariables(
+        this.previousLocals,
+        currentLocals
+      );
+
+      if (changes.length > 0) {
+        stepEvent.changes = changes;
+      }
+
+      this.previousLocals = currentLocals;
+    }
+
     this.formatter.emit(stepEvent);
 
     // Check assertions during trace
@@ -785,6 +814,7 @@ export class DebugSession {
     this.traceStepCount = 0;
     this.tracePath = [];
     this.traceInitialStackDepth = 0;
+    this.previousLocals = {};
 
     // Continue execution after trace
     await this.client!.continue({ threadId });

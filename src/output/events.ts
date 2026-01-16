@@ -23,6 +23,14 @@ export interface VariableValue {
   circular?: boolean;
 }
 
+// Variable change for semantic diffing
+export interface VariableChange {
+  name: string;
+  changeType: 'created' | 'modified' | 'deleted';
+  oldValue?: VariableValue;
+  newValue?: VariableValue;
+}
+
 // Stack frame in output
 export interface StackFrameInfo {
   frameId: number;
@@ -166,6 +174,8 @@ export interface TraceStepEvent extends BaseEvent {
   stepNumber: number;
   location: SourceLocation;
   stackDepth?: number;
+  /** Variable changes since last step (only present if --diff-vars enabled) */
+  changes?: VariableChange[];
 }
 
 export interface TraceCompletedEvent extends BaseEvent {

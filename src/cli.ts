@@ -31,6 +31,7 @@ export interface CliOptions {
   traceInto?: boolean;
   traceLimit?: number;
   traceUntil?: string;
+  diffVars?: boolean;
 }
 
 function parseTimeout(value: string): number {
@@ -132,6 +133,11 @@ export function createCli(): Command {
     .option(
       "--trace-until <expr>",
       "Stop trace when expression evaluates to truthy"
+    )
+    .option(
+      "--diff-vars",
+      "Show only changed variables in trace steps instead of full dumps",
+      false
     )
     .addOption(
       new Option("--env <key=value...>", "Environment variables for the program")
@@ -268,6 +274,7 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
       traceInto: options.traceInto,
       traceLimit: options.traceLimit,
       traceUntil: options.traceUntil,
+      diffVars: options.diffVars,
     },
     formatter
   );

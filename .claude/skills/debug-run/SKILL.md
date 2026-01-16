@@ -136,10 +136,39 @@ npx debug-run ./bin/Debug/net8.0/MyApp.dll \
   --pretty
 ```
 
+### Trace with Variable Diffing
+
+Use `--diff-vars` to see only what changed between steps instead of full variable dumps:
+
+```bash
+npx debug-run ./bin/Debug/net8.0/MyApp.dll \
+  -a vsdbg \
+  -b "src/Services/OrderService.cs:42" \
+  --trace \
+  --diff-vars \
+  --pretty
+```
+
+With `--diff-vars`, `trace_step` events include a `changes` field:
+
+```json
+{
+  "type": "trace_step",
+  "stepNumber": 5,
+  "location": { "file": "OrderService.cs", "line": 48 },
+  "changes": [
+    { "name": "total", "changeType": "modified", "oldValue": {"type": "int", "value": 100}, "newValue": {"type": "int", "value": 150} },
+    { "name": "discount", "changeType": "created", "newValue": {"type": "double", "value": 0.1} }
+  ]
+}
+```
+
+Change types: `created`, `modified`, `deleted`
+
 ### Trace Output Events
 
 - `trace_started` - Trace begins (includes config)
-- `trace_step` - Each step location (lightweight)
+- `trace_step` - Each step location (lightweight); includes `changes` if `--diff-vars` enabled
 - `trace_completed` - Trace finished with:
   - `stopReason`: `function_return`, `exception`, `breakpoint`, `limit_reached`, `expression_true`
   - `path`: Array of all locations visited
@@ -161,6 +190,7 @@ npx debug-run ./bin/Debug/net8.0/MyApp.dll \
 | `--trace-into` | Use stepIn instead of stepOver (follow into functions) |
 | `--trace-limit <N>` | Max steps in trace mode (default: 500) |
 | `--trace-until <expr>` | Stop trace when expression is truthy |
+| `--diff-vars` | Show only changed variables in trace steps (semantic diffing) |
 
 ## Output Format
 

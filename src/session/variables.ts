@@ -6,7 +6,7 @@
 
 import type { DapClient } from "../dap/client.js";
 import type { Variable as DapVariable } from "../dap/protocol.js";
-import type { VariableValue } from "../output/events.js";
+import type { VariableValue, VariableChange } from "../output/events.js";
 
 export interface VariableInspectorOptions {
   /** Maximum depth for recursive variable expansion (default: 2) */
@@ -241,5 +241,55 @@ export class VariableInspector {
     }
 
     return result;
+  }
+
+  /**
+   * Compare two variable snapshots and return changes
+   */
+  diffVariables(
+    prev: Record<string, VariableValue>,
+    curr: Record<string, VariableValue>
+  ): VariableChange[] {
+    const changes: VariableChange[] = [];
+
+    // Check for deleted or modified variables
+    for (const [name, oldVal] of Object.entries(prev)) {
+      if (!(name in curr)) {
+        changes.push({ name, changeType: 'deleted', oldValue: oldVal });
+      } else if (!this.valuesEqual(oldVal, curr[name])) {
+        changes.push({
+          name,
+          changeType: 'modified',
+          oldValue: oldVal,
+          newValue: curr[name]
+        });
+      }
+    }
+
+    // Check for created variables
+    for (const [name, newVal] of Object.entries(curr)) {
+      if (!(name in prev)) {
+        changes.push({ name, changeType: 'created', newValue: newVal });
+      }
+    }
+
+    return changes;
+  }
+
+  /**
+   * Deep equality check for VariableValue
+   */
+  valuesEqual(a: VariableValue, b: VariableValue): boolean {
+    // Quick check: same type?
+    if (a.type !== b.type) return false;
+
+    // For primitives, compare value directly
+    if (typeof a.value !== 'object' || a.value === null) {
+      return a.value === b.value;
+    }
+
+    // For objects/arrays, use JSON serialization
+    // (acceptable for debugging output - not perf critical)
+    return JSON.stringify(a.value) === JSON.stringify(b.value);
   }
 }

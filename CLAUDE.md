@@ -197,6 +197,7 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
 | `--trace-into` | Use stepIn instead of stepOver (follow into function calls) |
 | `--trace-limit <N>` | Maximum steps before stopping (default: 500) |
 | `--trace-until <expr>` | Stop when expression evaluates to truthy |
+| `--diff-vars` | Show only changed variables in trace steps instead of full dumps |
 
 ### Examples
 
@@ -236,6 +237,7 @@ Trace mode emits these events:
    - `stepNumber` - step counter
    - `location` - current file/line/function
    - `stackDepth` - current stack depth
+   - `changes` - variable changes since last step (only if `--diff-vars` enabled)
 
 3. `trace_completed` - Trace finished
    - `stopReason` - why trace stopped: `function_return`, `exception`, `breakpoint`, `limit_reached`, `expression_true`
@@ -255,6 +257,63 @@ Trace stops when any of these conditions is met:
 | `breakpoint` | Hit another breakpoint |
 | `limit_reached` | Reached `--trace-limit` steps |
 | `expression_true` | `--trace-until` expression became truthy |
+
+## Semantic Variable Diffing
+
+When tracing through code, agents receive full variable snapshots at each step by default. This creates noise - most variables don't change between steps. Variable diffing highlights only the mutations, making it easier to spot cause-and-effect.
+
+### Basic Usage
+
+```bash
+npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+  -a vsdbg \
+  -b "samples/dotnet/Program.cs:67" \
+  --trace \
+  --diff-vars \
+  --pretty \
+  -t 30s
+```
+
+### Output Format
+
+With `--diff-vars` enabled, `trace_step` events include a `changes` field showing only what changed:
+
+```json
+{
+  "type": "trace_step",
+  "stepNumber": 5,
+  "location": { "file": "Program.cs", "line": 72 },
+  "stackDepth": 3,
+  "changes": [
+    {
+      "name": "total",
+      "changeType": "modified",
+      "oldValue": { "type": "int", "value": 100 },
+      "newValue": { "type": "int", "value": 150 }
+    },
+    {
+      "name": "discount",
+      "changeType": "created",
+      "newValue": { "type": "double", "value": 0.1 }
+    }
+  ]
+}
+```
+
+### Change Types
+
+| Type | Description |
+|------|-------------|
+| `created` | Variable appeared (new scope entry or assignment) |
+| `modified` | Variable value changed from previous step |
+| `deleted` | Variable went out of scope |
+
+### Notes
+
+- The first trace step after a breakpoint hit has no `changes` (baseline established from breakpoint locals)
+- When stepping into/out of functions, variables may appear/disappear as expected
+- Deep object changes are detected via JSON serialization comparison
+- Circular references are handled safely
 
 ## Troubleshooting
 
