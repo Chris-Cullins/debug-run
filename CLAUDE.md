@@ -258,6 +258,72 @@ Trace stops when any of these conditions is met:
 | `limit_reached` | Reached `--trace-limit` steps |
 | `expression_true` | `--trace-until` expression became truthy |
 
+## Output Control
+
+Control where output goes and filter out events you don't need.
+
+### Output to File
+
+Write events to a file instead of stdout:
+
+```bash
+npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+  -a vsdbg \
+  -b "samples/dotnet/Program.cs:67" \
+  -o debug-output.json \
+  --pretty \
+  -t 30s
+```
+
+### Event Filtering
+
+Filter which event types are emitted using `--include` or `--exclude`:
+
+```bash
+# Only emit breakpoint hits and errors
+npx debug-run ./app.dll -a vsdbg \
+  -b "Program.cs:42" \
+  --include breakpoint_hit error session_end \
+  --pretty
+
+# Suppress noisy events (exceptions, program output)
+npx debug-run ./app.dll -a vsdbg \
+  -b "Program.cs:42" \
+  --exclude exception_thrown program_output \
+  --pretty
+```
+
+### Available Event Types
+
+| Event Type | Description |
+|------------|-------------|
+| `session_start` | Session begins |
+| `session_end` | Session ends with summary |
+| `process_launched` | Debuggee process started |
+| `process_attached` | Attached to running process |
+| `process_exited` | Debuggee process exited |
+| `breakpoint_set` | Breakpoint configured |
+| `breakpoint_hit` | Breakpoint was hit |
+| `exception_thrown` | Exception occurred |
+| `exception_breakpoint_set` | Exception breakpoint configured |
+| `logpoint_hit` | Logpoint triggered |
+| `step_completed` | Step operation completed |
+| `trace_started` | Trace mode began |
+| `trace_step` | Single trace step |
+| `trace_completed` | Trace mode finished |
+| `program_output` | stdout/stderr from debuggee |
+| `error` | Error from debug adapter |
+| `assertion_failed` | Assertion violation |
+
+### Output Options
+
+| Option | Description |
+|--------|-------------|
+| `-o, --output <file>` | Write events to file instead of stdout |
+| `--include <types...>` | Only emit these event types |
+| `--exclude <types...>` | Suppress these event types |
+| `--pretty` | Pretty print JSON output |
+
 ## Semantic Variable Diffing
 
 When tracing through code, agents receive full variable snapshots at each step by default. This creates noise - most variables don't change between steps. Variable diffing highlights only the mutations, making it easier to spot cause-and-effect.

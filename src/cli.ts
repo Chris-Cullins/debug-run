@@ -4,6 +4,7 @@
  * Argument parsing and command handling using Commander.
  */
 
+import * as fs from "node:fs";
 import { Command, Option } from "commander";
 import { getAdapter, getAdapterNames } from "./adapters/index.js";
 import { DebugSession } from "./session/manager.js";
@@ -32,6 +33,9 @@ export interface CliOptions {
   traceLimit?: number;
   traceUntil?: string;
   diffVars?: boolean;
+  output?: string;
+  include?: string[];
+  exclude?: string[];
 }
 
 function parseTimeout(value: string): number {
@@ -138,6 +142,18 @@ export function createCli(): Command {
       "--diff-vars",
       "Show only changed variables in trace steps instead of full dumps",
       false
+    )
+    .option(
+      "-o, --output <file>",
+      "Write events to file instead of stdout"
+    )
+    .option(
+      "--include <types...>",
+      "Only emit these event types (e.g., breakpoint_hit error)"
+    )
+    .option(
+      "--exclude <types...>",
+      "Suppress these event types (e.g., program_output exception_thrown)"
     )
     .addOption(
       new Option("--env <key=value...>", "Environment variables for the program")
@@ -248,8 +264,22 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
   // Parse timeout
   const timeout = parseTimeout(options.timeout || "60s");
 
-  // Create formatter
-  const formatter = new OutputFormatter({ pretty: options.pretty });
+  // Create output stream (file or stdout)
+  let outputStream: NodeJS.WritableStream = process.stdout;
+  let fileStream: fs.WriteStream | undefined;
+
+  if (options.output) {
+    fileStream = fs.createWriteStream(options.output);
+    outputStream = fileStream;
+  }
+
+  // Create formatter with filtering options
+  const formatter = new OutputFormatter({
+    pretty: options.pretty,
+    stream: outputStream,
+    include: options.include,
+    exclude: options.exclude,
+  });
 
   // Create and run session
   const session = new DebugSession(
@@ -283,6 +313,11 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
     await session.run();
   } catch {
     process.exit(1);
+  } finally {
+    // Close file stream if we created one
+    if (fileStream) {
+      fileStream.end();
+    }
   }
 }
 

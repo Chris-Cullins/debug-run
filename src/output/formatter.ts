@@ -11,21 +11,48 @@ export interface FormatterOptions {
   stream?: NodeJS.WritableStream;
   /** Pretty print JSON (default: false) */
   pretty?: boolean;
+  /** Only emit these event types (if specified) */
+  include?: string[];
+  /** Suppress these event types */
+  exclude?: string[];
 }
 
 export class OutputFormatter {
   private stream: NodeJS.WritableStream;
   private pretty: boolean;
+  private include?: Set<string>;
+  private exclude?: Set<string>;
 
   constructor(options: FormatterOptions = {}) {
     this.stream = options.stream ?? process.stdout;
     this.pretty = options.pretty ?? false;
+    this.include = options.include ? new Set(options.include) : undefined;
+    this.exclude = options.exclude ? new Set(options.exclude) : undefined;
+  }
+
+  /**
+   * Check if an event type should be emitted based on include/exclude filters
+   */
+  private shouldEmit(type: string): boolean {
+    // If include list is specified, only emit if type is in the list
+    if (this.include && !this.include.has(type)) {
+      return false;
+    }
+    // If exclude list is specified, don't emit if type is in the list
+    if (this.exclude && this.exclude.has(type)) {
+      return false;
+    }
+    return true;
   }
 
   /**
    * Emit a debug event
    */
   emit(event: DebugEvent): void {
+    if (!this.shouldEmit(event.type)) {
+      return;
+    }
+
     const json = this.pretty
       ? JSON.stringify(event, null, 2)
       : JSON.stringify(event);
