@@ -40,6 +40,11 @@ export interface CliOptions {
   // Test runner options
   testProject?: string;
   testFilter?: string;
+  // Token efficiency options
+  compactServices?: boolean;
+  expandServices?: boolean;
+  showNullProps?: boolean;
+  noDedupe?: boolean;
 }
 
 function parseTimeout(value: string): number {
@@ -180,7 +185,23 @@ export function createCli(): Command {
       "--test-filter <filter>",
       "Filter which tests to run (passed to dotnet test --filter)"
     )
-    .action(async (programPath: string | undefined, options: Omit<CliOptions, "program"> & { env?: string[]; adapter?: string; logpoint?: string[]; breakOnException?: string[]; attach?: boolean; pid?: number; testProject?: string; testFilter?: string }) => {
+    // Token efficiency options
+    .option(
+      "--expand-services",
+      "Fully expand service-like types (Logger, Repository, etc.) instead of showing compact form",
+      false
+    )
+    .option(
+      "--show-null-props",
+      "Include null/undefined properties in output (normally omitted for token efficiency)",
+      false
+    )
+    .option(
+      "--no-dedupe",
+      "Disable content-based deduplication of repeated objects",
+      false
+    )
+    .action(async (programPath: string | undefined, options: Omit<CliOptions, "program"> & { env?: string[]; adapter?: string; logpoint?: string[]; breakOnException?: string[]; attach?: boolean; pid?: number; testProject?: string; testFilter?: string; expandServices?: boolean; showNullProps?: boolean; noDedupe?: boolean }) => {
       // Handle test runner mode
       if (options.testProject) {
         // Test runner mode - automatically implies attach mode
@@ -390,6 +411,10 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
       traceLimit: options.traceLimit,
       traceUntil: options.traceUntil,
       diffVars: options.diffVars,
+      // Token efficiency options
+      expandServices: options.expandServices,
+      showNullProps: options.showNullProps,
+      noDedupe: options.noDedupe,
     },
     formatter
   );

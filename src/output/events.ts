@@ -21,6 +21,8 @@ export interface VariableValue {
   variablesReference?: number;
   /** True if this variable references an already-visited object (circular reference) */
   circular?: boolean;
+  /** True if this is a reference to a previously-seen object with identical content */
+  deduplicated?: boolean;
 }
 
 // Variable change for semantic diffing

@@ -608,6 +608,62 @@ On the sample .NET app with C# records:
 3. **Set lower `--trace-limit`** - Fewer steps = fewer events
 4. **Use specific `-e` expressions** - Instead of relying on full variable capture
 
+### Enterprise App Optimizations
+
+Large enterprise applications often have many service dependencies (Logger, Repository, Cache, etc.) that create verbose, repetitive output. debug-run includes three features (all enabled by default) to handle this:
+
+**1. Service Type Compaction** (`--expand-services` to disable)
+
+Types matching common service patterns are shown in compact form instead of fully expanded:
+```
+// Without compaction (verbose):
+"logger": {
+  "type": "Logger",
+  "value": {
+    "_config": {
+      "type": "LoggingConfiguration",
+      "value": { "MinLevel": "Debug", "EnableConsole": true, ... }
+    }
+  }
+}
+
+// With compaction (default):
+"logger": { "type": "Logger", "value": "{Logger}" }
+```
+
+Compacted type patterns: `Logger`, `ILogger`, `Repository`, `Service`, `Provider`, `Factory`, `Manager`, `Handler`, `Cache`, `EventBus`, `MetricsCollector`
+
+**2. Null Property Omission** (`--show-null-props` to disable)
+
+Properties with null/undefined values are omitted from output. In enterprise apps with many uninitialized dependencies, this dramatically reduces noise.
+
+**3. Content-Based Deduplication** (`--no-dedupe` to disable)
+
+When the same object content appears multiple times (e.g., the same `FeatureFlags` instance referenced by multiple services), subsequent occurrences show a reference instead of repeating the full content:
+```
+"discountService._features": { "type": "FeatureFlags", "value": { ... full content ... } }
+"loyaltyService._features": { "type": "FeatureFlags", "value": "[see: discountService._features]", "deduplicated": true }
+```
+
+**Measured Impact on Enterprise Sample:**
+
+| Scenario | Without Optimizations | With Optimizations | Reduction |
+|----------|----------------------|-------------------|-----------|
+| Constructor with 15 services | ~12KB | ~2KB | **83%** |
+| Method with service dependencies | ~8KB | ~1.5KB | **81%** |
+
+**Override Flags:**
+```bash
+# Full expansion of service types
+npx debug-run ... --expand-services
+
+# Include null properties
+npx debug-run ... --show-null-props
+
+# Disable deduplication
+npx debug-run ... --no-dedupe
+```
+
 ## Non-Obvious Implementation Details
 
 ### Shell Command Quoting

@@ -191,6 +191,53 @@ Change types: `created`, `modified`, `deleted`
 | `--trace-limit <N>` | Max steps in trace mode (default: 500) |
 | `--trace-until <expr>` | Stop trace when expression is truthy |
 | `--diff-vars` | Show only changed variables in trace steps (semantic diffing) |
+| `--expand-services` | Fully expand service types (Logger, Repository, etc.) instead of compact form |
+| `--show-null-props` | Include null/undefined properties in output |
+| `--no-dedupe` | Disable content-based deduplication of repeated objects |
+
+## Token Efficiency (Enterprise Apps)
+
+debug-run includes automatic optimizations for enterprise applications with many service dependencies. These are **enabled by default** and significantly reduce output noise:
+
+### Service Type Compaction
+
+Types matching common service patterns are shown in compact form:
+```json
+// Compact (default):
+"logger": { "type": "Logger", "value": "{Logger}" }
+
+// Expanded (with --expand-services):
+"logger": { "type": "Logger", "value": { "_config": {...}, ... } }
+```
+
+Compacted patterns: `Logger`, `ILogger`, `Repository`, `Service`, `Provider`, `Factory`, `Manager`, `Handler`, `Cache`, `EventBus`, `MetricsCollector`
+
+### Null Property Omission
+
+Properties with null/undefined values are omitted by default. Use `--show-null-props` to include them.
+
+### Content-Based Deduplication
+
+When the same object content appears multiple times, subsequent occurrences reference the first:
+```json
+"discountService._features": { "type": "FeatureFlags", "value": {...} }
+"loyaltyService._features": { "type": "FeatureFlags", "value": "[see: discountService._features]", "deduplicated": true }
+```
+
+Use `--no-dedupe` to disable this behavior.
+
+### Override Flags
+
+```bash
+# Full expansion of service types
+npx debug-run ... --expand-services
+
+# Include null properties  
+npx debug-run ... --show-null-props
+
+# Disable deduplication
+npx debug-run ... --no-dedupe
+```
 
 ## Output Format
 

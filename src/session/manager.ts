@@ -62,6 +62,13 @@ export interface SessionConfig {
   traceUntil?: string;
   /** Show only changed variables in trace steps instead of full dumps */
   diffVars?: boolean;
+  // Token efficiency options
+  /** Fully expand service-like types instead of compact form (default: false) */
+  expandServices?: boolean;
+  /** Include null properties in output (default: false) */
+  showNullProps?: boolean;
+  /** Disable content-based deduplication (default: false) */
+  noDedupe?: boolean;
 }
 
 type SessionState =
@@ -183,7 +190,11 @@ export class DebugSession {
 
     // Create managers
     this.breakpointManager = new BreakpointManager(this.client, this.formatter);
-    this.variableInspector = new VariableInspector(this.client);
+    this.variableInspector = new VariableInspector(this.client, {
+      compactServices: !this.config.expandServices,
+      omitNullProperties: !this.config.showNullProps,
+      deduplicateByContent: !this.config.noDedupe,
+    });
 
     // Add breakpoints
     for (const bp of this.config.breakpoints) {
