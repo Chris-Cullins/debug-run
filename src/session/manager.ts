@@ -25,6 +25,7 @@ import type {
   TraceStepEvent,
   TraceCompletedEvent,
   TraceStopReason,
+  AssertionFailedEvent,
 } from "../output/events.js";
 import { BreakpointManager } from "./breakpoints.js";
 import { VariableInspector } from "./variables.js";
@@ -39,6 +40,7 @@ export interface SessionConfig {
   logpoints?: string[];
   exceptionFilters?: string[];
   evaluations?: string[];
+  assertions?: string[];
   timeout?: number;
   captureLocals?: boolean;
   /** Number of steps to execute after hitting a breakpoint */
@@ -335,6 +337,25 @@ export class DebugSession {
         this.stepsExecuted++;
         this.remainingSteps--;
 
+        // Check assertions after step
+        if (topFrame) {
+          const failed = await this.checkAssertions(topFrame.id);
+          if (failed) {
+            await this.emitAssertionFailed(
+              threadId,
+              failed.assertion,
+              failed.value,
+              failed.error,
+              location,
+              stackTrace,
+              topFrame.id
+            );
+            this.isStepping = false;
+            this.endSession();
+            return;
+          }
+        }
+
         // Emit step_completed event if capturing each step
         if (this.config.captureEachStep) {
           const event: StepCompletedEvent = {
@@ -400,6 +421,25 @@ export class DebugSession {
         }
 
         this.breakpointsHit++;
+
+        // Check assertions before emitting breakpoint_hit
+        if (topFrame) {
+          const failed = await this.checkAssertions(topFrame.id);
+          if (failed) {
+            await this.emitAssertionFailed(
+              threadId,
+              failed.assertion,
+              failed.value,
+              failed.error,
+              location,
+              stackTrace,
+              topFrame.id
+            );
+            // End session on assertion failure
+            this.endSession();
+            return;
+          }
+        }
 
         const event: BreakpointHitEvent = {
           type: "breakpoint_hit",
@@ -615,6 +655,26 @@ export class DebugSession {
     };
     this.formatter.emit(stepEvent);
 
+    // Check assertions during trace
+    if (frameId) {
+      const failed = await this.checkAssertions(frameId);
+      if (failed) {
+        await this.emitAssertionFailed(
+          threadId,
+          failed.assertion,
+          failed.value,
+          failed.error,
+          location,
+          stackFrames,
+          frameId
+        );
+        // End trace and session
+        this.isTracing = false;
+        this.endSession();
+        return;
+      }
+    }
+
     // Check stop conditions
     const stopReason = await this.checkTraceStopConditions(
       stackDepth,
@@ -745,5 +805,77 @@ export class DebugSession {
     if (!isNaN(num)) return num !== 0;
     // Non-empty strings are truthy (but not empty string representations)
     return value.length > 0 && value !== '""' && value !== "''";
+  }
+
+  // ========== Assertion Methods ==========
+
+  /**
+   * Check all assertions against current frame state
+   * @returns First failed assertion or null if all pass
+   */
+  private async checkAssertions(
+    frameId: number
+  ): Promise<{ assertion: string; value: string; error?: string } | null> {
+    if (!this.config.assertions?.length) return null;
+
+    for (const assertion of this.config.assertions) {
+      try {
+        const result = await this.client!.evaluate({
+          expression: assertion,
+          frameId,
+          context: "watch",
+        });
+
+        // Assertion fails if result is falsy
+        if (!this.isTruthy(result.result)) {
+          return {
+            assertion,
+            value: result.result,
+          };
+        }
+      } catch (error) {
+        // Evaluation error = assertion failed
+        return {
+          assertion,
+          value: "",
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+
+    return null; // All assertions passed
+  }
+
+  /**
+   * Emit assertion failed event and end session
+   */
+  private async emitAssertionFailed(
+    threadId: number,
+    assertion: string,
+    actualValue: string,
+    evaluationError: string | undefined,
+    location: SourceLocation,
+    stackTrace: StackFrameInfo[],
+    frameId: number
+  ): Promise<void> {
+    // Capture full locals for debugging context
+    let locals: Record<string, VariableValue> = {};
+    if (this.config.captureLocals !== false) {
+      locals = await this.variableInspector!.getLocals(frameId);
+    }
+
+    const event: AssertionFailedEvent = {
+      type: "assertion_failed",
+      timestamp: new Date().toISOString(),
+      threadId,
+      assertion,
+      actualValue,
+      evaluationError,
+      location,
+      stackTrace,
+      locals,
+    };
+
+    this.formatter.emit(event);
   }
 }

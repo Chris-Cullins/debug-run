@@ -59,6 +59,34 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
   -t 30s
 ```
 
+### Assertion-Based Debugging
+
+Use `--assert` to declare invariants that must remain truthy. The debugger halts immediately when any assertion fails, transforming debugging from "search for the bug" to "let the bug announce itself."
+
+```bash
+npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+  -a vsdbg \
+  -b "samples/dotnet/Program.cs:67" \
+  --assert "order.Total >= 0" \
+  --assert "order.Items.Count > 0" \
+  --assert "this._inventory != null" \
+  --pretty \
+  -t 30s
+```
+
+Assertions are checked:
+- At every breakpoint hit
+- At every trace step (if `--trace` enabled)
+- At every regular step (if `--steps` enabled)
+
+When an assertion fails, the session stops immediately with an `assertion_failed` event containing:
+- The failed assertion expression
+- The actual value that caused the failure
+- Full stack trace and local variables
+- Error message (if the assertion threw an exception)
+
+**Important**: Assertions should be pure expressions without side effects. Avoid expressions like `counter++` in assertions.
+
 ### Expected Output
 
 The tool outputs NDJSON (newline-delimited JSON) events:
@@ -71,8 +99,14 @@ The tool outputs NDJSON (newline-delimited JSON) events:
    - `stackTrace` - call stack
    - `locals` - captured local variables with recursive expansion
    - `evaluations` - results of --eval expressions
-5. `process_exited` - Program finished
-6. `session_end` - Summary with statistics
+5. `assertion_failed` - Assertion violated (if `--assert` used), includes:
+   - `assertion` - the expression that failed
+   - `actualValue` - the value that made it fail
+   - `location` - where the assertion was checked
+   - `stackTrace` - full call stack
+   - `locals` - captured variables for context
+6. `process_exited` - Program finished
+7. `session_end` - Summary with statistics
 
 ## Debug Adapters
 

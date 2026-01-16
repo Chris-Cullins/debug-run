@@ -18,6 +18,7 @@ export interface CliOptions {
   breakpoint: string[];
   logpoint: string[];
   eval: string[];
+  assert: string[];
   breakOnException?: string[];
   timeout?: string;
   captureLocals?: boolean;
@@ -78,6 +79,11 @@ export function createCli(): Command {
     .option(
       "-e, --eval <expr...>",
       "Expressions to evaluate when breakpoints are hit",
+      []
+    )
+    .option(
+      "--assert <expr...>",
+      "Invariant expressions that must remain truthy; stops on first violation",
       []
     )
     .option(
@@ -251,6 +257,7 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
       logpoints: options.logpoint && options.logpoint.length > 0 ? options.logpoint : undefined,
       exceptionFilters: options.breakOnException,
       evaluations: options.eval.length > 0 ? options.eval : undefined,
+      assertions: options.assert.length > 0 ? options.assert : undefined,
       timeout,
       captureLocals: options.captureLocals,
       steps: options.steps,

@@ -15,8 +15,11 @@ Agents can write and run code, but when something goes wrong, they're blind. The
 - **Exception breakpoints**: Break on thrown/uncaught exceptions
 - **Variable inspection**: Automatic recursive expansion of locals and `this`
 - **Expression evaluation**: Evaluate arbitrary expressions at breakpoints
+- **Assertion-based debugging**: Declare invariants that halt on violation
+- **Trace mode**: Automatically step through execution paths
 - **Stepping**: Step over, step into, step out with state capture
 - **Logpoints**: Log messages without breaking execution
+- **Attach mode**: Debug running processes
 - **Structured output**: NDJSON event stream for easy parsing
 
 ## Installation
@@ -85,6 +88,7 @@ Options:
   --cwd <path>                      Working directory for the program
   -b, --breakpoint <spec...>        Breakpoint specs (file:line, file:line?cond, file:line#count)
   -e, --eval <expr...>              Expressions to evaluate at breakpoints
+  --assert <expr...>                Invariant expressions; stops on first violation
   -l, --logpoint <spec...>          Logpoints (file:line|message with {expr})
   --break-on-exception <filter...>  Break on exceptions (all, uncaught, user-unhandled)
   -t, --timeout <duration>          Session timeout (default: 60s)
@@ -92,6 +96,12 @@ Options:
   --pretty                          Pretty print JSON output
   -s, --steps <count>               Steps to execute after breakpoint hit
   --capture-each-step               Capture state at each step
+  --trace                           Enable trace mode - step through code
+  --trace-into                      Use stepIn instead of stepOver in trace
+  --trace-limit <N>                 Max steps in trace mode (default: 500)
+  --trace-until <expr>              Stop trace when expression is truthy
+  --attach                          Attach to running process
+  --pid <id>                        Process ID to attach to
   --env <key=value...>              Environment variables
 
 Commands:
@@ -234,6 +244,47 @@ npx tsx ./src/index.ts ./app.dll \
   -b "src/OrderService.cs:67?order.Total > 1000" \
   --pretty
 ```
+
+### Assertion-based debugging
+
+Declare invariants that must remain true. The debugger halts immediately when any assertion fails:
+
+```bash
+npx tsx ./src/index.ts ./app.dll \
+  -a dotnet \
+  -b "src/OrderService.cs:45" \
+  --assert "order.Total >= 0" \
+  --assert "order.Items.Count > 0" \
+  --assert "customer != null" \
+  --pretty
+```
+
+When an assertion fails, you get an `assertion_failed` event with:
+- The failed assertion expression
+- The actual value
+- Full stack trace and locals
+- Location where it failed
+
+Assertions are checked at breakpoints, during stepping, and during trace mode.
+
+### Trace mode (follow execution path)
+
+Automatically step through code after hitting a breakpoint:
+
+```bash
+npx tsx ./src/index.ts ./app.dll \
+  -a dotnet \
+  -b "src/OrderService.cs:45" \
+  --trace \
+  --trace-limit 100 \
+  --pretty
+```
+
+Trace mode options:
+- `--trace`: Enable trace mode
+- `--trace-into`: Follow into function calls (default: step over)
+- `--trace-limit <N>`: Max steps before stopping (default: 500)
+- `--trace-until <expr>`: Stop when expression becomes truthy
 
 ## Agent Integration
 

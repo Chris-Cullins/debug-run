@@ -69,6 +69,20 @@ npx debug-run ./bin/Debug/net8.0/MyApp.dll \
   --pretty
 ```
 
+### With Assertions (Halt on Invariant Violations)
+
+```bash
+npx debug-run ./bin/Debug/net8.0/MyApp.dll \
+  -a vsdbg \
+  -b "src/Services/OrderService.cs:42" \
+  --assert "order.Total >= 0" \
+  --assert "order.Items.Count > 0" \
+  --assert "this._repository != null" \
+  --pretty
+```
+
+Assertions are checked at every breakpoint hit, trace step, and regular step. When an assertion fails, the debugger halts immediately with an `assertion_failed` event containing the failed expression, actual value, stack trace, and locals.
+
 ## Attach Mode (Debug Running Process)
 
 For long-running services like web APIs:
@@ -138,6 +152,7 @@ npx debug-run ./bin/Debug/net8.0/MyApp.dll \
 | `-a, --adapter <name>` | Debug adapter: `vsdbg` (recommended for .NET), `debugpy` (Python) |
 | `-b, --breakpoint <loc>` | Breakpoint location as `file:line` (can specify multiple) |
 | `-e, --eval <expr>` | Expression to evaluate at breakpoints (can specify multiple) |
+| `--assert <expr>` | Invariant expression; stops on first violation (can specify multiple) |
 | `-t, --timeout <time>` | Timeout duration: `30s`, `2m`, `5m` (default: 60s) |
 | `--pretty` | Pretty-print JSON output |
 | `--attach` | Attach to running process instead of launching |
@@ -174,6 +189,31 @@ debug-run outputs NDJSON events. Key event types:
     "evaluations": {
       "order.Total": { "value": "125.50" },
       "order.Items.Count": { "value": "3" }
+    }
+  }
+}
+```
+
+### assertion_failed
+
+```json
+{
+  "type": "assertion_failed",
+  "timestamp": "...",
+  "threadId": 1,
+  "assertion": "order.Total >= 0",
+  "actualValue": "-50",
+  "evaluationError": null,
+  "location": {
+    "file": "src/Services/OrderService.cs",
+    "line": 42,
+    "function": "ProcessOrder"
+  },
+  "stackTrace": [...],
+  "locals": {
+    "order": {
+      "type": "Order",
+      "value": {...}
     }
   }
 }
