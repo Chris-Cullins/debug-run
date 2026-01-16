@@ -67,6 +67,9 @@ Or install the C# Dev Kit extension for additional features.
     type: "coreclr",
     request: "attach",
     processId: options.pid,
+    // justMyCode must be false for test debugging to work properly
+    // (testhost runs in optimized mode, breakpoints won't hit otherwise)
+    justMyCode: false,
   }),
 
   exceptionFilters: [

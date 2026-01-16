@@ -452,6 +452,99 @@ curl http://localhost:5009/orders
 curl -X POST http://localhost:5009/orders/ORD-001/process
 ```
 
+## Test Debugging (NUnit, xUnit, MSTest)
+
+debug-run supports debugging .NET unit tests with automatic test runner orchestration. This eliminates the manual two-terminal workflow of starting `dotnet test` with `VSTEST_HOST_DEBUG=1` and then attaching.
+
+### Quick Start
+
+```bash
+# Build the test project first
+cd samples/nunit && dotnet build && cd ../..
+
+# Debug tests with a single command
+npx debug-run --test-project samples/nunit \
+  -b "samples/nunit/CalculatorTests.cs:57" \
+  --pretty \
+  -t 60s
+```
+
+### How It Works
+
+1. Launches `dotnet test --no-build` with `VSTEST_HOST_DEBUG=1`
+2. Parses the testhost PID from the output
+3. Automatically attaches the debugger to the testhost process
+4. Sets breakpoints and captures variables as normal
+
+### Test Runner Options
+
+| Option | Description |
+|--------|-------------|
+| `--test-project <path>` | Path to test project directory or .csproj file |
+| `--test-filter <filter>` | Filter tests (passed to `dotnet test --filter`) |
+
+### Examples
+
+```bash
+# Debug all tests in a project
+npx debug-run --test-project samples/nunit \
+  -b "samples/nunit/CalculatorTests.cs:57" \
+  --pretty
+
+# Debug a specific test
+npx debug-run --test-project samples/nunit \
+  --test-filter "Add_TwoPositiveNumbers_ReturnsSum" \
+  -b "samples/nunit/CalculatorTests.cs:57" \
+  --pretty
+
+# Debug with expression evaluation
+npx debug-run --test-project samples/nunit \
+  -b "samples/nunit/CalculatorTests.cs:57" \
+  -e "a" -e "b" -e "result" \
+  --pretty
+
+# Debug with tracing
+npx debug-run --test-project samples/nunit \
+  -b "samples/nunit/CalculatorTests.cs:57" \
+  --trace \
+  --trace-into \
+  --pretty
+```
+
+### Good Breakpoint Locations (Sample NUnit Project)
+
+| Line | Location | Description |
+|------|----------|-------------|
+| 57 | `Add_TwoPositiveNumbers_ReturnsSum` | After variable setup, before calling Add() |
+| 12 | `Calculator.Add` | Inside the Add method |
+| 31 | `Calculator.Divide` | Inside the Divide method (exception check) |
+
+### Manual Two-Terminal Workflow (Alternative)
+
+If you need more control, you can still use the manual approach:
+
+**Terminal 1:**
+```bash
+cd samples/nunit
+dotnet test --environment "VSTEST_HOST_DEBUG=1" --no-build
+# Note the PID from: "Process Id: 12345, Name: testhost"
+```
+
+**Terminal 2:**
+```bash
+npx debug-run --attach --pid 12345 \
+  -a vsdbg \
+  -b "samples/nunit/CalculatorTests.cs:57" \
+  --pretty \
+  -t 60s
+```
+
+### Notes
+
+- The adapter defaults to `vsdbg` for test debugging (can override with `-a`)
+- Build your test project before debugging (`dotnet build`)
+- The test runner is automatically cleaned up after the debug session ends
+
 ## File Structure
 
 ```
@@ -464,12 +557,17 @@ src/
 │   ├── variables.ts  # Variable inspection (Phase 2)
 │   └── breakpoints.ts
 ├── adapters/         # Adapter configurations
+├── util/
+│   └── test-runner.ts  # Test runner orchestration
 └── output/           # Event formatting
 
 samples/
 ├── dotnet/           # Console app for testing launch mode
 │   ├── Program.cs    # Order processing simulation
 │   └── SampleApp.csproj
+├── nunit/            # NUnit tests for testing test debugging
+│   ├── CalculatorTests.cs  # Calculator class + tests
+│   └── SampleTests.csproj
 └── aspnet/           # Web API for testing attach mode
     └── SampleApi/
         └── Program.cs  # Minimal API with orders endpoints

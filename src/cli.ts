@@ -10,6 +10,7 @@ import { getAdapter, getAdapterNames } from "./adapters/index.js";
 import { DebugSession } from "./session/manager.js";
 import { OutputFormatter } from "./output/formatter.js";
 import { installNetcoredbg, isNetcoredbgInstalled, getNetcoredbgPath } from "./util/adapter-installer.js";
+import { launchTestRunner, cleanupTestRunner, type TestRunnerResult } from "./util/test-runner.js";
 
 export interface CliOptions {
   adapter: string;
@@ -36,6 +37,9 @@ export interface CliOptions {
   output?: string;
   include?: string[];
   exclude?: string[];
+  // Test runner options
+  testProject?: string;
+  testFilter?: string;
 }
 
 function parseTimeout(value: string): number {
@@ -168,7 +172,26 @@ export function createCli(): Command {
       "Process ID to attach to (requires --attach)",
       (val: string) => parseInt(val, 10)
     )
-    .action(async (programPath: string | undefined, options: Omit<CliOptions, "program"> & { env?: string[]; adapter?: string; logpoint?: string[]; breakOnException?: string[]; attach?: boolean; pid?: number }) => {
+    .option(
+      "--test-project <path>",
+      "Run dotnet test with VSTEST_HOST_DEBUG=1 and auto-attach (for NUnit/xUnit/MSTest)"
+    )
+    .option(
+      "--test-filter <filter>",
+      "Filter which tests to run (passed to dotnet test --filter)"
+    )
+    .action(async (programPath: string | undefined, options: Omit<CliOptions, "program"> & { env?: string[]; adapter?: string; logpoint?: string[]; breakOnException?: string[]; attach?: boolean; pid?: number; testProject?: string; testFilter?: string }) => {
+      // Handle test runner mode
+      if (options.testProject) {
+        // Test runner mode - automatically implies attach mode
+        if (!options.adapter) {
+          // Default to vsdbg for .NET tests
+          options.adapter = "vsdbg";
+        }
+        await runTestDebugSession({ ...options, program: programPath, adapter: options.adapter });
+        return;
+      }
+
       // Validate attach mode
       if (options.attach) {
         if (!options.pid) {
@@ -179,7 +202,7 @@ export function createCli(): Command {
       } else {
         // Launch mode requires a program
         if (!programPath) {
-          console.error("Error: <program> argument is required (or use --attach --pid)");
+          console.error("Error: <program> argument is required (or use --attach --pid, or --test-project)");
           console.error("Usage: debug-run <program> -a <adapter> -b <breakpoint>");
           process.exit(1);
         }
@@ -210,6 +233,68 @@ export function createCli(): Command {
     });
 
   return program;
+}
+
+/**
+ * Run a debug session for .NET tests using the test runner.
+ * Automatically launches dotnet test with VSTEST_HOST_DEBUG=1 and attaches.
+ */
+async function runTestDebugSession(options: CliOptions & { env?: string[] }): Promise<void> {
+  // Validate adapter
+  const adapter = getAdapter(options.adapter);
+  if (!adapter) {
+    console.error(`Unknown adapter: ${options.adapter}`);
+    console.error(`Available adapters: ${getAdapterNames().join(", ")}`);
+    process.exit(1);
+  }
+
+  // Check if adapter is installed
+  const adapterPath = await adapter.detect();
+  if (!adapterPath) {
+    console.error(`Adapter "${adapter.name}" is not installed.`);
+    console.error(adapter.installHint);
+    process.exit(1);
+  }
+
+  // Validate breakpoints
+  if (options.breakpoint.length === 0) {
+    console.error("Error: At least one --breakpoint is required for test debugging");
+    console.error("Example: -b \"path/to/TestFile.cs:42\"");
+    process.exit(1);
+  }
+
+  console.error(`Starting test runner for: ${options.testProject}`);
+  if (options.testFilter) {
+    console.error(`Test filter: ${options.testFilter}`);
+  }
+
+  let testRunner: TestRunnerResult | null = null;
+
+  try {
+    // Launch the test runner and get the PID
+    testRunner = await launchTestRunner({
+      testProject: options.testProject!,
+      filter: options.testFilter,
+      cwd: options.cwd,
+      onProgress: (msg) => console.error(msg),
+    });
+
+    console.error(`\nTesthost process started with PID: ${testRunner.pid}`);
+    console.error("Attaching debugger...\n");
+
+    // Now run the debug session in attach mode with the discovered PID
+    await runDebugSession({
+      ...options,
+      attach: true,
+      pid: testRunner.pid,
+    });
+
+  } finally {
+    // Clean up the test runner process
+    if (testRunner) {
+      cleanupTestRunner(testRunner.process);
+    }
+  }
 }
 
 async function runDebugSession(options: CliOptions & { env?: string[] }): Promise<void> {
