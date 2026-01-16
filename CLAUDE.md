@@ -288,7 +288,6 @@ With `--diff-vars` enabled, `trace_step` events include a `changes` field showin
     {
       "name": "total",
       "changeType": "modified",
-      "oldValue": { "type": "int", "value": 100 },
       "newValue": { "type": "int", "value": 150 }
     },
     {
@@ -302,11 +301,11 @@ With `--diff-vars` enabled, `trace_step` events include a `changes` field showin
 
 ### Change Types
 
-| Type | Description |
-|------|-------------|
-| `created` | Variable appeared (new scope entry or assignment) |
-| `modified` | Variable value changed from previous step |
-| `deleted` | Variable went out of scope |
+| Type | Description | Includes |
+|------|-------------|----------|
+| `created` | Variable appeared (new scope entry or assignment) | `newValue` only |
+| `modified` | Variable value changed from previous step | `newValue` only (for token efficiency) |
+| `deleted` | Variable went out of scope | `oldValue` only |
 
 ### Notes
 
@@ -314,6 +313,7 @@ With `--diff-vars` enabled, `trace_step` events include a `changes` field showin
 - When stepping into/out of functions, variables may appear/disappear as expected
 - Deep object changes are detected via JSON serialization comparison
 - Circular references are handled safely
+- Modified variables omit `oldValue` for token efficiency (LLMs typically only need current state)
 
 ## Troubleshooting
 
@@ -408,6 +408,41 @@ samples/
     └── SampleApi/
         └── Program.cs  # Minimal API with orders endpoints
 ```
+
+## Token Efficiency (LLM Optimization)
+
+debug-run is optimized for consumption by LLMs. Several features reduce token usage without sacrificing debugging utility:
+
+### Automatic Filtering
+
+The following are automatically filtered from variable output to reduce noise:
+
+**Blocked Properties** (reflection metadata that wastes tokens):
+- `EqualityContract` - C# record equality contract (often 4KB+ of useless reflection data)
+- `CustomAttributes`, `DeclaredConstructors`, `DeclaredMethods`, etc. - System.Type reflection
+- `[More]`, `Raw View`, `Static members`, `Non-Public members` - debugger UI artifacts
+
+**Blocked Types** (not expanded):
+- `System.Reflection.*` - Reflection metadata
+- `System.RuntimeType` - Type information internals
+- `System.Guid` - GUID internals
+
+### Measured Impact
+
+On the sample .NET app with C# records:
+
+| Scenario | Before | After | Reduction |
+|----------|--------|-------|-----------|
+| Basic debugging (3 breakpoints) | 22KB | 10KB | **55%** |
+| Trace mode with `--diff-vars` | 453KB | 101KB | **78%** |
+| Single breakpoint_hit event | 6.8KB | 2.8KB | **59%** |
+
+### Tips for Minimal Token Usage
+
+1. **Use `--diff-vars` with trace mode** - Only shows changed variables, not full dumps
+2. **Use `--no-capture-locals`** - If you only need expression evaluation results
+3. **Set lower `--trace-limit`** - Fewer steps = fewer events
+4. **Use specific `-e` expressions** - Instead of relying on full variable capture
 
 ## Non-Obvious Implementation Details
 

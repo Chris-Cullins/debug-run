@@ -121,7 +121,7 @@ describe("VariableInspector", () => {
       ]);
     });
 
-    it("detects modified primitive variables", () => {
+    it("detects modified primitive variables (newValue only for token efficiency)", () => {
       const prev: Record<string, VariableValue> = {
         total: { type: "int", value: 100 },
       };
@@ -131,17 +131,17 @@ describe("VariableInspector", () => {
 
       const changes = inspector.diffVariables(prev, curr);
 
+      // Modified variables only include newValue (not oldValue) for token efficiency
       expect(changes).toEqual([
         {
           name: "total",
           changeType: "modified",
-          oldValue: { type: "int", value: 100 },
           newValue: { type: "int", value: 150 },
         },
       ]);
     });
 
-    it("detects modified object variables", () => {
+    it("detects modified object variables (newValue only for token efficiency)", () => {
       const prev: Record<string, VariableValue> = {
         order: {
           type: "Order",
@@ -157,11 +157,11 @@ describe("VariableInspector", () => {
 
       const changes = inspector.diffVariables(prev, curr);
 
+      // Modified variables only include newValue (not oldValue) for token efficiency
       expect(changes).toEqual([
         {
           name: "order",
           changeType: "modified",
-          oldValue: { type: "Order", value: { total: { type: "int", value: 100 } } },
           newValue: { type: "Order", value: { total: { type: "int", value: 200 } } },
         },
       ]);
@@ -227,7 +227,7 @@ describe("VariableInspector", () => {
       expect(changes).toEqual([]);
     });
 
-    it("detects type changes as modifications", () => {
+    it("detects type changes as modifications (newValue only for token efficiency)", () => {
       const prev: Record<string, VariableValue> = {
         value: { type: "int", value: 42 },
       };
@@ -237,11 +237,11 @@ describe("VariableInspector", () => {
 
       const changes = inspector.diffVariables(prev, curr);
 
+      // Modified variables only include newValue (not oldValue) for token efficiency
       expect(changes).toEqual([
         {
           name: "value",
           changeType: "modified",
-          oldValue: { type: "int", value: 42 },
           newValue: { type: "string", value: "42" },
         },
       ]);

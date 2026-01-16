@@ -8,6 +8,52 @@ import type { DapClient } from "../dap/client.js";
 import type { Variable as DapVariable } from "../dap/protocol.js";
 import type { VariableValue, VariableChange } from "../output/events.js";
 
+/**
+ * Property names that provide no debugging value and waste tokens.
+ * These are typically reflection metadata, compiler-generated properties, etc.
+ */
+const BLOCKED_PROPERTIES = new Set([
+  // C# record EqualityContract and related reflection noise
+  "EqualityContract",
+  "CustomAttributes",
+  "DeclaredConstructors",
+  "DeclaredEvents",
+  "DeclaredFields",
+  "DeclaredMembers",
+  "DeclaredMethods",
+  "DeclaredNestedTypes",
+  "DeclaredProperties",
+  "DeclaringMethod",
+  "DeclaringType",
+  "GenericParameterAttributes",
+  "GenericParameterPosition",
+  "GenericTypeArguments",
+  "ImplementedInterfaces",
+  "MemberType",
+  "MetadataToken",
+  "ReflectedType",
+  "TypeHandle",
+  "UnderlyingSystemType",
+  // Common noise
+  "[More]",
+  "Raw View",
+  "Static members",
+  "Non-Public members",
+]);
+
+/**
+ * Type patterns that should not be expanded (regex patterns).
+ * These types contain reflection/internal data that wastes tokens.
+ */
+const BLOCKED_TYPE_PATTERNS = [
+  /^System\.Reflection\./,
+  /^System\.RuntimeType$/,
+  /^System\.Type\s*\{/,
+  /\{System\.RuntimeType\}$/,
+  /^System\.Reflection\.Assembly/,
+  /^System\.Guid$/,
+];
+
 export interface VariableInspectorOptions {
   /** Maximum depth for recursive variable expansion (default: 2) */
   maxDepth?: number;
@@ -80,6 +126,13 @@ export class VariableInspector {
       variablesReference: v.variablesReference > 0 ? v.variablesReference : undefined,
     };
 
+    // Don't expand blocked types (reflection metadata, etc.)
+    if (this.isBlockedType(v.type)) {
+      variable.expandable = false;
+      variable.variablesReference = undefined;
+      return variable;
+    }
+
     // Auto-expand objects to the specified depth
     if (v.variablesReference > 0 && depth > 0) {
       // Check for circular reference
@@ -98,17 +151,22 @@ export class VariableInspector {
           count: this.options.maxCollectionItems,
         });
 
+        // Filter out blocked properties
+        const filteredChildren = children.variables.filter(
+          child => !this.isBlockedProperty(child.name)
+        );
+
         // Check if this is a collection/array
-        if (this.isCollection(v.type, children.variables)) {
+        if (this.isCollection(v.type, filteredChildren)) {
           variable.value = {
             type: v.type || "collection",
-            count: this.getCollectionCount(v, children.variables.length),
-            items: await this.expandCollection(children.variables, depth - 1, visited),
+            count: this.getCollectionCount(v, filteredChildren.length),
+            items: await this.expandCollection(filteredChildren, depth - 1, visited),
           };
         } else {
           // Regular object
           const obj: Record<string, VariableValue> = {};
-          for (const child of children.variables) {
+          for (const child of filteredChildren) {
             obj[child.name] = await this.expandVariable(child, depth - 1, visited);
           }
           variable.value = obj;
@@ -151,6 +209,21 @@ export class VariableInspector {
     }
 
     return results;
+  }
+
+  /**
+   * Check if a property name should be skipped (reflection noise, etc.)
+   */
+  private isBlockedProperty(name: string): boolean {
+    return BLOCKED_PROPERTIES.has(name);
+  }
+
+  /**
+   * Check if a type should not be expanded (reflection types, etc.)
+   */
+  private isBlockedType(type: string | undefined): boolean {
+    if (!type) return false;
+    return BLOCKED_TYPE_PATTERNS.some(pattern => pattern.test(type));
   }
 
   /**
@@ -244,7 +317,11 @@ export class VariableInspector {
   }
 
   /**
-   * Compare two variable snapshots and return changes
+   * Compare two variable snapshots and return changes.
+   *
+   * For token efficiency, modified variables only include the new value.
+   * LLMs typically only need current state, not the previous value.
+   * Deleted variables include oldValue so the LLM knows what was removed.
    */
   diffVariables(
     prev: Record<string, VariableValue>,
@@ -255,12 +332,13 @@ export class VariableInspector {
     // Check for deleted or modified variables
     for (const [name, oldVal] of Object.entries(prev)) {
       if (!(name in curr)) {
+        // For deletions, include oldValue so LLM knows what was removed
         changes.push({ name, changeType: 'deleted', oldValue: oldVal });
       } else if (!this.valuesEqual(oldVal, curr[name])) {
+        // For modifications, only include newValue (token efficiency)
         changes.push({
           name,
           changeType: 'modified',
-          oldValue: oldVal,
           newValue: curr[name]
         });
       }
