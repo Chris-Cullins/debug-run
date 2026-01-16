@@ -18,7 +18,6 @@ import type {
   SourceLocation,
   StackFrameInfo,
   VariableValue,
-  VariableChange,
   BreakpointHitEvent,
   ExceptionThrownEvent,
   StepCompletedEvent,
@@ -30,6 +29,7 @@ import type {
 } from "../output/events.js";
 import { BreakpointManager } from "./breakpoints.js";
 import { VariableInspector } from "./variables.js";
+import { flattenExceptionChainFromLocals } from "./exceptions.js";
 
 export interface SessionConfig {
   adapter: AdapterConfig;
@@ -69,6 +69,11 @@ export interface SessionConfig {
   showNullProps?: boolean;
   /** Disable content-based deduplication (default: false) */
   noDedupe?: boolean;
+  // Exception handling options
+  /** Flatten exception chains and classify root causes (default: true) */
+  flattenExceptions?: boolean;
+  /** Maximum depth to traverse exception chain (default: 10) */
+  exceptionChainDepth?: number;
 }
 
 type SessionState =
@@ -408,6 +413,7 @@ export class DebugSession {
           await this.endTrace(threadId, "exception", stackTrace, topFrame?.id);
         }
 
+        // Build base exception event
         const event: ExceptionThrownEvent = {
           type: "exception_thrown",
           timestamp: new Date().toISOString(),
@@ -419,6 +425,20 @@ export class DebugSession {
           location,
           locals,
         };
+
+        // Flatten exception chain if enabled (default: true)
+        if (this.config.flattenExceptions !== false) {
+          const chainResult = flattenExceptionChainFromLocals(
+            locals,
+            this.config.exceptionChainDepth ?? 10
+          );
+          
+          if (chainResult) {
+            event.exceptionChain = chainResult.chain;
+            event.rootCause = chainResult.rootCause;
+          }
+        }
+
         this.formatter.emit(event);
 
         // Continue after exception (trace already ended and continued if tracing)

@@ -45,6 +45,9 @@ export interface CliOptions {
   expandServices?: boolean;
   showNullProps?: boolean;
   noDedupe?: boolean;
+  // Exception handling options
+  flattenExceptions?: boolean;
+  exceptionChainDepth?: number;
 }
 
 function parseTimeout(value: string): number {
@@ -201,7 +204,23 @@ export function createCli(): Command {
       "Disable content-based deduplication of repeated objects",
       false
     )
-    .action(async (programPath: string | undefined, options: Omit<CliOptions, "program"> & { env?: string[]; adapter?: string; logpoint?: string[]; breakOnException?: string[]; attach?: boolean; pid?: number; testProject?: string; testFilter?: string; expandServices?: boolean; showNullProps?: boolean; noDedupe?: boolean }) => {
+    // Exception handling options
+    .option(
+      "--flatten-exceptions",
+      "Enable exception chain flattening and root cause classification (default: true)",
+      true
+    )
+    .option(
+      "--no-flatten-exceptions",
+      "Disable exception chain flattening and root cause classification"
+    )
+    .option(
+      "--exception-chain-depth <depth>",
+      "Maximum depth to traverse exception chain (default: 10)",
+      (val: string) => parseInt(val, 10),
+      10
+    )
+    .action(async (programPath: string | undefined, options: Omit<CliOptions, "program"> & { env?: string[]; adapter?: string; logpoint?: string[]; breakOnException?: string[]; attach?: boolean; pid?: number; testProject?: string; testFilter?: string; expandServices?: boolean; showNullProps?: boolean; noDedupe?: boolean; flattenExceptions?: boolean; exceptionChainDepth?: number }) => {
       // Handle test runner mode
       if (options.testProject) {
         // Test runner mode - automatically implies attach mode
@@ -415,6 +434,9 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
       expandServices: options.expandServices,
       showNullProps: options.showNullProps,
       noDedupe: options.noDedupe,
+      // Exception handling options
+      flattenExceptions: options.flattenExceptions,
+      exceptionChainDepth: options.exceptionChainDepth,
     },
     formatter
   );

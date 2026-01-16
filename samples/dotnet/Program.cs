@@ -150,6 +150,42 @@ catch (ValidationException ex)
     Console.WriteLine($"Validation failed: {ex.Message}");
 }
 
+// ============ Nested Exception Scenarios ============
+// These demonstrate exception chain flattening for debugging
+
+// Scenario 1: Database-like nested exception (simulated)
+Console.WriteLine("\nTesting nested exceptions...");
+var exceptionDemo = new ExceptionDemoService();
+
+try
+{
+    exceptionDemo.SimulateDatabaseFailure();  // Breakpoint target for nested exceptions
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Caught: {ex.GetType().Name} - {ex.Message}");
+}
+
+// Scenario 2: HTTP-like nested exception
+try
+{
+    exceptionDemo.SimulateHttpFailure();  // Another nested exception scenario
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Caught: {ex.GetType().Name} - {ex.Message}");
+}
+
+// Scenario 3: File system nested exception
+try
+{
+    exceptionDemo.SimulateFileSystemFailure();  // File-related nested exception
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Caught: {ex.GetType().Name} - {ex.Message}");
+}
+
 Console.WriteLine("Done!");
 
 // ============ Configuration Classes ============
@@ -620,4 +656,174 @@ public class OrderService
 public class ValidationException : Exception
 {
     public ValidationException(string message) : base(message) { }
+}
+
+// ============ Exception Demo Service for testing chain flattening ============
+
+/// <summary>
+/// Demonstrates various nested exception scenarios for testing exception chain flattening.
+/// </summary>
+public class ExceptionDemoService
+{
+    /// <summary>
+    /// Simulates a database failure with nested exceptions:
+    /// DataAccessException -> DbConnectionException -> SocketException-like
+    /// </summary>
+    public void SimulateDatabaseFailure()
+    {
+        try
+        {
+            ConnectToDatabase();
+        }
+        catch (Exception ex)
+        {
+            throw new DataAccessException("Failed to execute query on Orders table", ex);
+        }
+    }
+
+    private void ConnectToDatabase()
+    {
+        try
+        {
+            OpenSocket("db-server.local", 5432);
+        }
+        catch (Exception ex)
+        {
+            throw new DbConnectionException("Unable to connect to database server 'db-server.local:5432'", ex);
+        }
+    }
+
+    private void OpenSocket(string host, int port)
+    {
+        // Simulate a low-level connection failure
+        throw new NetworkException($"Connection refused to {host}:{port}", 10061)
+        {
+            Host = host,
+            Port = port
+        };
+    }
+
+    /// <summary>
+    /// Simulates an HTTP failure with nested exceptions:
+    /// ServiceException -> HttpException -> NetworkException
+    /// </summary>
+    public void SimulateHttpFailure()
+    {
+        try
+        {
+            CallExternalApi();
+        }
+        catch (Exception ex)
+        {
+            throw new ServiceException("Payment gateway service unavailable", ex);
+        }
+    }
+
+    private void CallExternalApi()
+    {
+        try
+        {
+            MakeHttpRequest("https://api.payment.example.com/charge");
+        }
+        catch (Exception ex)
+        {
+            throw new HttpException("HTTP request failed", 503, ex);
+        }
+    }
+
+    private void MakeHttpRequest(string url)
+    {
+        throw new NetworkException($"Connection timed out connecting to {url}", 10060)
+        {
+            Host = new Uri(url).Host,
+            Port = 443
+        };
+    }
+
+    /// <summary>
+    /// Simulates a file system failure with nested exceptions:
+    /// ConfigurationException -> FileAccessException -> underlying error
+    /// </summary>
+    public void SimulateFileSystemFailure()
+    {
+        try
+        {
+            LoadConfiguration();
+        }
+        catch (Exception ex)
+        {
+            throw new ConfigException("Failed to initialize application configuration", ex);
+        }
+    }
+
+    private void LoadConfiguration()
+    {
+        try
+        {
+            ReadConfigFile("/etc/myapp/config.json");
+        }
+        catch (Exception ex)
+        {
+            throw new FileAccessException("Cannot read configuration file", "/etc/myapp/config.json", ex);
+        }
+    }
+
+    private void ReadConfigFile(string path)
+    {
+        throw new System.IO.FileNotFoundException($"Configuration file not found", path);
+    }
+}
+
+// Custom exception classes for demonstrating chain flattening
+
+public class DataAccessException : Exception
+{
+    public DataAccessException(string message, Exception inner) : base(message, inner) { }
+}
+
+public class DbConnectionException : Exception
+{
+    public DbConnectionException(string message, Exception inner) : base(message, inner) { }
+}
+
+public class NetworkException : Exception
+{
+    public int ErrorCode { get; }
+    public string? Host { get; init; }
+    public int Port { get; init; }
+    
+    public NetworkException(string message, int errorCode) : base(message)
+    {
+        ErrorCode = errorCode;
+    }
+}
+
+public class ServiceException : Exception
+{
+    public ServiceException(string message, Exception inner) : base(message, inner) { }
+}
+
+public class HttpException : Exception
+{
+    public int StatusCode { get; }
+    
+    public HttpException(string message, int statusCode, Exception inner) : base(message, inner)
+    {
+        StatusCode = statusCode;
+    }
+}
+
+public class ConfigException : Exception
+{
+    public ConfigException(string message, Exception inner) : base(message, inner) { }
+}
+
+public class FileAccessException : Exception
+{
+    public string FilePath { get; }
+    
+    public FileAccessException(string message, string filePath, Exception inner) : base(message, inner)
+    {
+        FilePath = filePath;
+    }
 }

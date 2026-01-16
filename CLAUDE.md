@@ -87,6 +87,87 @@ When an assertion fails, the session stops immediately with an `assertion_failed
 
 **Important**: Assertions should be pure expressions without side effects. Avoid expressions like `counter++` in assertions.
 
+### Exception Chain Flattening
+
+When `--break-on-exception` is used, exceptions are automatically analyzed to:
+1. Traverse the `InnerException` chain
+2. Extract structured data from each exception
+3. Classify the root cause by category
+4. Generate actionable debugging hints
+
+This feature is enabled by default. Use `--no-flatten-exceptions` to disable it.
+
+```bash
+npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+  -a vsdbg \
+  --break-on-exception all \
+  --pretty \
+  -t 30s
+```
+
+When an exception with inner exceptions is caught, the `exception_thrown` event includes:
+
+```json
+{
+  "type": "exception_thrown",
+  "exception": {
+    "type": "DataAccessException",
+    "message": "Failed to execute query"
+  },
+  "exceptionChain": [
+    {
+      "depth": 0,
+      "type": "DataAccessException",
+      "message": "Failed to execute query on Orders table",
+      "source": "MyApp",
+      "throwSite": "Void ExecuteQuery()"
+    },
+    {
+      "depth": 1,
+      "type": "DbConnectionException",
+      "message": "Unable to connect to database server",
+      "source": "MyApp",
+      "throwSite": "Void Connect()"
+    },
+    {
+      "depth": 2,
+      "type": "NetworkException",
+      "message": "Connection refused to db-server:5432",
+      "data": { "errorCode": 10061 },
+      "isRootCause": true
+    }
+  ],
+  "rootCause": {
+    "type": "NetworkException",
+    "message": "Connection refused to db-server:5432",
+    "category": "network",
+    "actionableHint": "Connection refused - check if the target service is running and the port is correct"
+  }
+}
+```
+
+#### Exception Categories
+
+| Category | Exception Types |
+|----------|----------------|
+| `network` | SocketException, HttpRequestException, WebException |
+| `database` | SqlException, NpgsqlException, DbUpdateException |
+| `authentication` | AuthenticationException, UnauthorizedAccessException |
+| `validation` | ArgumentException, FormatException, ValidationException |
+| `timeout` | TimeoutException, TaskCanceledException |
+| `file_system` | FileNotFoundException, DirectoryNotFoundException, IOException |
+| `configuration` | ConfigurationException, OptionsValidationException |
+| `null_reference` | NullReferenceException |
+| `argument` | InvalidOperationException, NotSupportedException |
+| `unknown` | Unrecognized exception types |
+
+#### Exception Options
+
+| Option | Description |
+|--------|-------------|
+| `--no-flatten-exceptions` | Disable exception chain analysis |
+| `--exception-chain-depth <n>` | Max depth to traverse (default: 10) |
+
 ### Expected Output
 
 The tool outputs NDJSON (newline-delimited JSON) events:

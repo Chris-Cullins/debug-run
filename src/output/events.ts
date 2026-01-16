@@ -113,6 +113,50 @@ export interface BreakpointHitEvent extends BaseEvent {
 }
 
 // Exception events
+
+/** Category of exception for quick classification */
+export type ExceptionCategory =
+  | "network"
+  | "database"
+  | "authentication"
+  | "validation"
+  | "timeout"
+  | "file_system"
+  | "configuration"
+  | "null_reference"
+  | "argument"
+  | "unknown";
+
+/** A single entry in the flattened exception chain */
+export interface ExceptionChainEntry {
+  /** Depth in the chain (0 = outermost, highest = root cause) */
+  depth: number;
+  /** Fully qualified exception type name */
+  type: string;
+  /** Exception message */
+  message: string;
+  /** Source assembly/module that threw */
+  source?: string;
+  /** Method/location where exception was thrown */
+  throwSite?: string;
+  /** Additional data extracted from specific exception types */
+  data?: Record<string, unknown>;
+  /** True if this is the deepest exception (root cause) */
+  isRootCause?: boolean;
+}
+
+/** Information about the root cause of an exception */
+export interface RootCauseInfo {
+  /** Exception type */
+  type: string;
+  /** Exception message */
+  message: string;
+  /** Classified category */
+  category: ExceptionCategory;
+  /** Actionable hint for resolving the issue */
+  actionableHint?: string;
+}
+
 export interface ExceptionThrownEvent extends BaseEvent {
   type: "exception_thrown";
   threadId: number;
@@ -122,6 +166,10 @@ export interface ExceptionThrownEvent extends BaseEvent {
     stackTrace?: string;
     innerException?: string;
   };
+  /** Flattened exception chain from outer to inner (root cause) */
+  exceptionChain?: ExceptionChainEntry[];
+  /** Classified root cause with actionable hint */
+  rootCause?: RootCauseInfo;
   location: SourceLocation;
   locals: Record<string, VariableValue>;
 }
