@@ -11,6 +11,7 @@ Use the `debug-run` CLI tool to programmatically debug applications via the Debu
 
 - Debugging .NET applications (using vsdbg adapter)
 - Debugging Python applications (using debugpy adapter)
+- Debugging JavaScript/TypeScript applications (using js-debug/node adapter)
 - Capturing runtime state at specific code locations
 - Evaluating expressions to inspect object properties
 - Attaching to running processes for live debugging
@@ -29,272 +30,147 @@ Check available adapters:
 npx debug-run list-adapters
 ```
 
-## Launch Mode (Debug New Process)
+## Language-Specific Guides
 
-### Basic Usage
+For detailed setup, examples, and troubleshooting for each language:
+
+- [.NET Debugging Guide](DOTNET.md) - vsdbg adapter, ASP.NET attach mode, NUnit test debugging
+- [Python Debugging Guide](PYTHON.md) - debugpy adapter, VS Code integration, sample app
+- [TypeScript/JavaScript Debugging Guide](TYPESCRIPT.md) - js-debug adapter, source maps, Node.js
+
+## Basic Usage
 
 ```bash
 npx debug-run <program> -a <adapter> -b "<file:line>" [options]
 ```
 
-### .NET Example
+### Quick Examples
 
 ```bash
-npx debug-run ./bin/Debug/net8.0/MyApp.dll \
-  -a vsdbg \
-  -b "src/Services/OrderService.cs:42" \
-  --pretty \
-  -t 30s
+# .NET
+npx debug-run ./bin/Debug/net8.0/MyApp.dll -a vsdbg -b "src/Service.cs:42" --pretty
+
+# Python
+npx debug-run ./main.py -a python -b "src/processor.py:25" --pretty
+
+# TypeScript/JavaScript
+npx debug-run ./dist/index.js -a node -b "src/index.ts:100" --pretty
 ```
-
-### Python Example
-
-```bash
-npx debug-run ./main.py \
-  -a debugpy \
-  -b "src/processor.py:25" \
-  --pretty \
-  -t 30s
-```
-
-### JavaScript/TypeScript Example
-
-```bash
-# First build the TypeScript project
-cd samples/typescript && npm install && npm run build && cd ../..
-
-# Debug the compiled JavaScript
-npx debug-run samples/typescript/dist/index.js \
-  -a node \
-  -b "samples/typescript/src/index.ts:160" \
-  --pretty \
-  -t 30s
-```
-
-### With Expression Evaluation
-
-```bash
-npx debug-run ./bin/Debug/net8.0/MyApp.dll \
-  -a vsdbg \
-  -b "src/Services/OrderService.cs:42" \
-  -e "order.Total" \
-  -e "order.Items.Count" \
-  -e "this._repository" \
-  --pretty
-```
-
-### With Assertions (Halt on Invariant Violations)
-
-```bash
-npx debug-run ./bin/Debug/net8.0/MyApp.dll \
-  -a vsdbg \
-  -b "src/Services/OrderService.cs:42" \
-  --assert "order.Total >= 0" \
-  --assert "order.Items.Count > 0" \
-  --assert "this._repository != null" \
-  --pretty
-```
-
-Assertions are checked at every breakpoint hit, trace step, and regular step. When an assertion fails, the debugger halts immediately with an `assertion_failed` event containing the failed expression, actual value, stack trace, and locals.
-
-## Attach Mode (Debug Running Process)
-
-For long-running services like web APIs:
-
-```bash
-npx debug-run --attach --pid <PID> \
-  -a vsdbg \
-  -b "src/Controllers/OrderController.cs:28" \
-  -e "request.OrderId" \
-  --pretty \
-  -t 60s
-```
-
-**Important**: After attaching, wait 10-15 seconds before triggering the code path. The debugger needs time to instrument the process.
-
-## Trace Mode (Follow Execution Path)
-
-Trace mode automatically steps through code after hitting a breakpoint, capturing the execution path. Use this to understand how code flows through functions, loops, and conditionals.
-
-### Basic Trace
-
-```bash
-npx debug-run ./bin/Debug/net8.0/MyApp.dll \
-  -a vsdbg \
-  -b "src/Services/OrderService.cs:42" \
-  --trace \
-  --pretty \
-  -t 30s
-```
-
-### Trace Into Function Calls
-
-```bash
-npx debug-run ./bin/Debug/net8.0/MyApp.dll \
-  -a vsdbg \
-  -b "src/Services/OrderService.cs:42" \
-  --trace \
-  --trace-into \
-  --trace-limit 100 \
-  --pretty
-```
-
-### Trace Until Condition
-
-```bash
-npx debug-run ./bin/Debug/net8.0/MyApp.dll \
-  -a vsdbg \
-  -b "src/Services/OrderService.cs:42" \
-  --trace \
-  --trace-until "order.Total > 100" \
-  --pretty
-```
-
-### Trace with Variable Diffing
-
-Use `--diff-vars` to see only what changed between steps instead of full variable dumps:
-
-```bash
-npx debug-run ./bin/Debug/net8.0/MyApp.dll \
-  -a vsdbg \
-  -b "src/Services/OrderService.cs:42" \
-  --trace \
-  --diff-vars \
-  --pretty
-```
-
-With `--diff-vars`, `trace_step` events include a `changes` field:
-
-```json
-{
-  "type": "trace_step",
-  "stepNumber": 5,
-  "location": { "file": "OrderService.cs", "line": 48 },
-  "changes": [
-    { "name": "total", "changeType": "modified", "oldValue": {"type": "int", "value": 100}, "newValue": {"type": "int", "value": 150} },
-    { "name": "discount", "changeType": "created", "newValue": {"type": "double", "value": 0.1} }
-  ]
-}
-```
-
-Change types: `created`, `modified`, `deleted`
-
-### Trace Output Events
-
-- `trace_started` - Trace begins (includes config)
-- `trace_step` - Each step location (lightweight); includes `changes` if `--diff-vars` enabled
-- `trace_completed` - Trace finished with:
-  - `stopReason`: `function_return`, `exception`, `breakpoint`, `limit_reached`, `expression_true`
-  - `path`: Array of all locations visited
-  - `locals`: Variables at final location
 
 ## Options Reference
 
+### Core Options
+
 | Option | Description |
 |--------|-------------|
-| `-a, --adapter <name>` | Debug adapter: `vsdbg` (recommended for .NET), `debugpy` (Python) |
+| `-a, --adapter <name>` | Debug adapter: `vsdbg` (.NET), `python`/`debugpy` (Python), `node`/`js` (JS/TS) |
 | `-b, --breakpoint <loc>` | Breakpoint location as `file:line` (can specify multiple) |
 | `-e, --eval <expr>` | Expression to evaluate at breakpoints (can specify multiple) |
-| `--assert <expr>` | Invariant expression; stops on first violation (can specify multiple) |
+| `--assert <expr>` | Invariant expression; halts on first violation (can specify multiple) |
 | `-t, --timeout <time>` | Timeout duration: `30s`, `2m`, `5m` (default: 60s) |
 | `--pretty` | Pretty-print JSON output |
+| `-o, --output <file>` | Write events to file instead of stdout |
+
+### Attach Mode
+
+| Option | Description |
+|--------|-------------|
 | `--attach` | Attach to running process instead of launching |
 | `--pid <id>` | Process ID for attach mode |
+
+### Trace Mode
+
+| Option | Description |
+|--------|-------------|
 | `--trace` | Enable trace mode - step through code after breakpoint |
 | `--trace-into` | Use stepIn instead of stepOver (follow into functions) |
 | `--trace-limit <N>` | Max steps in trace mode (default: 500) |
 | `--trace-until <expr>` | Stop trace when expression is truthy |
-| `--diff-vars` | Show only changed variables in trace steps (semantic diffing) |
-| `--expand-services` | Fully expand service types (Logger, Repository, etc.) instead of compact form |
+| `--diff-vars` | Show only changed variables in trace steps |
+
+### Token Efficiency
+
+| Option | Description |
+|--------|-------------|
+| `--expand-services` | Fully expand service types (Logger, Repository, etc.) |
 | `--show-null-props` | Include null/undefined properties in output |
-| `--no-dedupe` | Disable content-based deduplication of repeated objects |
+| `--no-dedupe` | Disable content-based deduplication |
 
-## Token Efficiency (Enterprise Apps)
+### Event Filtering
 
-debug-run includes automatic optimizations for enterprise applications with many service dependencies. These are **enabled by default** and significantly reduce output noise:
+| Option | Description |
+|--------|-------------|
+| `--include <types...>` | Only emit these event types |
+| `--exclude <types...>` | Suppress these event types |
 
-### Service Type Compaction
+### Exception Handling
 
-Types matching common service patterns are shown in compact form:
-```json
-// Compact (default):
-"logger": { "type": "Logger", "value": "{Logger}" }
+| Option | Description |
+|--------|-------------|
+| `--break-on-exception <filter>` | Break on exceptions: `all`, `uncaught`, `raised` |
+| `--no-flatten-exceptions` | Disable exception chain analysis |
+| `--exception-chain-depth <n>` | Max depth to traverse (default: 10) |
 
-// Expanded (with --expand-services):
-"logger": { "type": "Logger", "value": { "_config": {...}, ... } }
-```
+## Assertions
 
-Compacted patterns: `Logger`, `ILogger`, `Repository`, `Service`, `Provider`, `Factory`, `Manager`, `Handler`, `Cache`, `EventBus`, `MetricsCollector`
-
-### Null Property Omission
-
-Properties with null/undefined values are omitted by default. Use `--show-null-props` to include them.
-
-### Content-Based Deduplication
-
-When the same object content appears multiple times, subsequent occurrences reference the first:
-```json
-"discountService._features": { "type": "FeatureFlags", "value": {...} }
-"loyaltyService._features": { "type": "FeatureFlags", "value": "[see: discountService._features]", "deduplicated": true }
-```
-
-Use `--no-dedupe` to disable this behavior.
-
-### Override Flags
+Use `--assert` to declare invariants. The debugger halts immediately when any assertion fails:
 
 ```bash
-# Full expansion of service types
-npx debug-run ... --expand-services
+npx debug-run ./app.dll -a vsdbg \
+  -b "src/OrderService.cs:42" \
+  --assert "order.Total >= 0" \
+  --assert "order.Items.Count > 0" \
+  --pretty
+```
 
-# Include null properties  
-npx debug-run ... --show-null-props
+Assertions are checked at every breakpoint hit, trace step, and regular step.
 
-# Disable deduplication
-npx debug-run ... --no-dedupe
+## Trace Mode
+
+Trace mode automatically steps through code after hitting a breakpoint:
+
+```bash
+# Basic trace
+npx debug-run ./app.dll -a vsdbg -b "src/Service.cs:42" --trace --pretty
+
+# Trace into function calls with limit
+npx debug-run ./app.dll -a vsdbg -b "src/Service.cs:42" --trace --trace-into --trace-limit 100 --pretty
+
+# Trace until condition
+npx debug-run ./app.dll -a vsdbg -b "src/Service.cs:42" --trace --trace-until "total > 100" --pretty
+
+# Trace with variable diffing (shows only changes)
+npx debug-run ./app.dll -a vsdbg -b "src/Service.cs:42" --trace --diff-vars --pretty
 ```
 
 ## Output Format
 
-debug-run outputs NDJSON events. Key event types:
+debug-run outputs NDJSON (newline-delimited JSON) events:
 
-### breakpoint_hit
+### Event Types
 
-```json
-{
-  "event": "breakpoint_hit",
-  "timestamp": "...",
-  "data": {
-    "location": {
-      "file": "src/Services/OrderService.cs",
-      "line": 42,
-      "function": "ProcessOrder"
-    },
-    "stackTrace": [...],
-    "locals": {
-      "order": {
-        "type": "Order",
-        "value": {...}
-      },
-      "this": {...}
-    },
-    "evaluations": {
-      "order.Total": { "value": "125.50" },
-      "order.Items.Count": { "value": "3" }
-    }
-  }
-}
-```
+| Event | Description |
+|-------|-------------|
+| `session_start` | Debug session initialized |
+| `breakpoint_set` | Breakpoint configured (check `verified` field) |
+| `process_launched` | Debuggee process started |
+| `process_attached` | Attached to running process |
+| `breakpoint_hit` | Breakpoint was hit with locals and evaluations |
+| `assertion_failed` | Assertion violation with context |
+| `trace_started` | Trace mode began |
+| `trace_step` | Single trace step (with `changes` if `--diff-vars`) |
+| `trace_completed` | Trace finished |
+| `exception_thrown` | Exception occurred |
+| `program_output` | stdout/stderr from debuggee |
+| `process_exited` | Program terminated |
+| `session_end` | Summary with statistics |
 
-### assertion_failed
+### breakpoint_hit Example
 
 ```json
 {
-  "type": "assertion_failed",
+  "type": "breakpoint_hit",
   "timestamp": "...",
-  "threadId": 1,
-  "assertion": "order.Total >= 0",
-  "actualValue": "-50",
-  "evaluationError": null,
   "location": {
     "file": "src/Services/OrderService.cs",
     "line": 42,
@@ -302,63 +178,51 @@ debug-run outputs NDJSON events. Key event types:
   },
   "stackTrace": [...],
   "locals": {
-    "order": {
-      "type": "Order",
-      "value": {...}
-    }
+    "order": { "type": "Order", "value": {...} },
+    "this": {...}
+  },
+  "evaluations": {
+    "order.Total": { "result": "125.50" },
+    "order.Items.Count": { "result": "3" }
   }
 }
 ```
 
-### Other Events
+## Token Efficiency
 
-- `session_start` - Debug session initialized
-- `breakpoint_set` - Breakpoint configured (check `verified` field)
-- `process_launched` / `process_attached` - Debuggee started/connected
-- `process_exited` - Program terminated
-- `session_end` - Summary with statistics
+debug-run includes automatic optimizations for enterprise applications:
+
+### Service Type Compaction (default)
+Types like `Logger`, `Repository`, `Service` are shown in compact form:
+```json
+"logger": { "type": "Logger", "value": "{Logger}" }
+```
+
+### Null Property Omission (default)
+Properties with null/undefined values are omitted.
+
+### Content-Based Deduplication (default)
+Repeated object content references the first occurrence:
+```json
+"loyaltyService._features": { "value": "[see: discountService._features]", "deduplicated": true }
+```
 
 ## Best Practices
 
 1. **Use relative paths for breakpoints**: `-b "src/MyFile.cs:42"` not `-b "MyFile.cs:42"`
 
-2. **Adapter selection**:
-   - .NET: Use `vsdbg` (most stable, requires VS Code C# extension)
-   - Python: Use `debugpy` or `python` (uses VS Code Python extension's bundled debugpy, or falls back to pip)
-   - JavaScript/TypeScript: Use `node` or `js` (requires VS Code js-debug extension or `npx debug-run install-adapter node`)
+2. **Expression timing**: Expressions evaluate BEFORE the breakpoint line executes. Variables assigned on that line will be null/unset.
 
-3. **Expression timing**: Expressions evaluate BEFORE the breakpoint line executes. Variables assigned on that line will be null/unset.
+3. **Unverified breakpoints**: In attach mode, breakpoints start as `verified: false`. They verify when the code path is hit.
 
-4. **Unverified breakpoints**: In attach mode, breakpoints start as `verified: false`. This is normal; they verify when the code path is hit.
-
-5. **Long-running processes**: Use appropriate timeouts (`-t 5m`) and trigger the code path while debug-run is waiting.
+4. **Long-running processes**: Use appropriate timeouts (`-t 5m`) and trigger the code path while debug-run is waiting.
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| "Adapter not installed" | Run `list-adapters` to check; install VS Code C# extension for vsdbg |
+| "Adapter not installed" | Run `list-adapters` to check available adapters |
 | Breakpoint not hitting | Verify path is relative to working directory and line has executable code |
-| vsdbg license warning | Informational only, can be ignored |
-| netcoredbg SIGSEGV | Use vsdbg instead (`-a vsdbg`) |
+| Session timeout | Increase timeout with `-t 2m` or `-t 5m` |
 
-## Example Workflow
-
-1. **Identify the code location** to debug
-2. **Build the application** if needed (`dotnet build`, etc.)
-3. **Run debug-run** with breakpoint and expressions
-4. **Parse the JSON output** to extract variable values
-5. **Iterate** with additional breakpoints or expressions as needed
-
-```bash
-# Example: Debug a failing order calculation
-npx debug-run ./bin/Debug/net8.0/OrderProcessor.dll \
-  -a vsdbg \
-  -b "src/Calculator.cs:89" \
-  -e "subtotal" \
-  -e "taxRate" \
-  -e "discount" \
-  -e "this._config" \
-  --pretty \
-  -t 30s
-```
+For language-specific troubleshooting, see the language guides linked above.
