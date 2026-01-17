@@ -34,17 +34,40 @@ npx debug-run --help
 
 ### Claude Code Skill (Recommended)
 
-To enable Claude Code to use debug-run effectively, install the skill:
+To enable AI coding assistants to use debug-run effectively, install the skill:
 
 ```bash
-debug-run install-skill
+# Install for Claude Code (default)
+npx debug-run install-skill
+
+# Install for GitHub Copilot
+npx debug-run install-skill --copilot
+
+# Install for both Claude Code and GitHub Copilot
+npx debug-run install-skill --claude --copilot
+
+# Install to project directory (for team sharing)
+npx debug-run install-skill --project              # Claude: .claude/skills/
+npx debug-run install-skill --copilot --project    # Copilot: .github/skills/
+
+# Install to custom directory
+npx debug-run install-skill --dir /path/to/skills
 ```
 
-This copies the skill files to `~/.claude/skills/debug-run/`, teaching Claude how to use debug-run for debugging .NET, Python, and TypeScript applications. The skill includes:
+| Option | Description |
+|--------|-------------|
+| `--claude` | Install to Claude Code (`~/.claude/skills/`) - default |
+| `--copilot` | Install to GitHub Copilot (`~/.copilot/skills/`) |
+| `--project` | Install to project directory instead of user home |
+| `--dir <path>` | Install to custom directory |
+
+This copies skill files teaching AI assistants how to use debug-run for debugging .NET, Python, and TypeScript applications:
 - `SKILL.md` - Main skill with options reference and best practices
 - `DOTNET.md` - .NET-specific guide (vsdbg, ASP.NET, NUnit)
 - `PYTHON.md` - Python-specific guide (debugpy)
 - `TYPESCRIPT.md` - TypeScript/JavaScript guide (js-debug)
+
+**Note**: For GitHub Copilot, enable the `chat.useAgentSkills` setting in VS Code for Agent Skills support.
 
 ### Development Setup
 

@@ -262,9 +262,13 @@ export function createCli(): Command {
   // Add install-skill subcommand
   program
     .command('install-skill')
-    .description('Install the Claude Code skill for debug-run to ~/.claude/skills/')
-    .action(async () => {
-      await installSkill();
+    .description('Install the debug-run skill for AI coding assistants')
+    .option('--claude', 'Install to Claude Code (~/.claude/skills/)')
+    .option('--copilot', 'Install to GitHub Copilot (~/.copilot/skills/)')
+    .option('--project', 'Install to project directory instead of user home')
+    .option('--dir <path>', 'Install to custom directory')
+    .action(async (options: { claude?: boolean; copilot?: boolean; project?: boolean; dir?: string }) => {
+      await installSkill(options);
     });
 
   return program;
@@ -526,12 +530,73 @@ async function installAdapter(name: string): Promise<void> {
   }
 }
 
-async function installSkill(): Promise<void> {
-  const os = await import('node:os');
-  const path = await import('node:path');
+interface InstallSkillOptions {
+  claude?: boolean;
+  copilot?: boolean;
+  project?: boolean;
+  dir?: string;
+}
 
+interface SkillTarget {
+  name: string;
+  directory: string;
+}
+
+function getSkillTargets(options: InstallSkillOptions): SkillTarget[] {
+  const os = require('node:os');
+  const path = require('node:path');
+  
   const homeDir = os.homedir();
-  const targetDir = path.join(homeDir, '.claude', 'skills', 'debug-run');
+  const projectDir = process.cwd();
+  const targets: SkillTarget[] = [];
+
+  // If custom directory specified, use only that
+  if (options.dir) {
+    targets.push({
+      name: 'custom',
+      directory: path.resolve(options.dir, 'debug-run'),
+    });
+    return targets;
+  }
+
+  // Determine which targets to install to
+  const installClaude = options.claude || (!options.copilot && !options.dir);
+  const installCopilot = options.copilot;
+
+  if (installClaude) {
+    if (options.project) {
+      targets.push({
+        name: 'Claude Code (project)',
+        directory: path.join(projectDir, '.claude', 'skills', 'debug-run'),
+      });
+    } else {
+      targets.push({
+        name: 'Claude Code',
+        directory: path.join(homeDir, '.claude', 'skills', 'debug-run'),
+      });
+    }
+  }
+
+  if (installCopilot) {
+    if (options.project) {
+      // Copilot recommends .github/skills/ for project skills
+      targets.push({
+        name: 'GitHub Copilot (project)',
+        directory: path.join(projectDir, '.github', 'skills', 'debug-run'),
+      });
+    } else {
+      targets.push({
+        name: 'GitHub Copilot',
+        directory: path.join(homeDir, '.copilot', 'skills', 'debug-run'),
+      });
+    }
+  }
+
+  return targets;
+}
+
+async function installSkill(options: InstallSkillOptions = {}): Promise<void> {
+  const path = await import('node:path');
 
   // Find the skill source directory (relative to this module)
   const moduleDir = path.dirname(new URL(import.meta.url).pathname);
@@ -557,29 +622,51 @@ async function installSkill(): Promise<void> {
     process.exit(1);
   }
 
-  // Create target directory
-  fs.mkdirSync(targetDir, { recursive: true });
+  // Get target directories based on options
+  const targets = getSkillTargets(options);
+  
+  if (targets.length === 0) {
+    console.error('Error: No installation target specified.');
+    console.error('Use --claude, --copilot, --project, or --dir <path>');
+    process.exit(1);
+  }
 
   // Copy skill files
   const files = ['SKILL.md', 'DOTNET.md', 'PYTHON.md', 'TYPESCRIPT.md'];
-  let copiedCount = 0;
 
-  for (const file of files) {
-    const srcPath = path.join(sourceDir, file);
-    const destPath = path.join(targetDir, file);
+  for (const target of targets) {
+    // Create target directory
+    fs.mkdirSync(target.directory, { recursive: true });
 
-    if (fs.existsSync(srcPath)) {
-      fs.copyFileSync(srcPath, destPath);
-      copiedCount++;
+    let copiedCount = 0;
+    for (const file of files) {
+      const srcPath = path.join(sourceDir, file);
+      const destPath = path.join(target.directory, file);
+
+      if (fs.existsSync(srcPath)) {
+        fs.copyFileSync(srcPath, destPath);
+        copiedCount++;
+      }
     }
+
+    console.log(`Installed debug-run skill for ${target.name}:`);
+    console.log(`  Directory: ${target.directory}`);
+    console.log(`  Files copied: ${copiedCount}`);
+    for (const file of files) {
+      if (fs.existsSync(path.join(target.directory, file))) {
+        console.log(`    - ${file}`);
+      }
+    }
+    console.log();
   }
 
-  console.log(`Installed debug-run skill to: ${targetDir}`);
-  console.log(`Copied ${copiedCount} files:`);
-  for (const file of files) {
-    if (fs.existsSync(path.join(targetDir, file))) {
-      console.log(`  - ${file}`);
-    }
+  // Print usage hints based on targets
+  const targetNames = targets.map(t => t.name);
+  if (targetNames.some(n => n.includes('Claude'))) {
+    console.log('Claude Code will now use this skill when debugging.');
   }
-  console.log('\nClaude Code will now use this skill when debugging.');
+  if (targetNames.some(n => n.includes('Copilot'))) {
+    console.log('GitHub Copilot will now use this skill when debugging.');
+    console.log('Note: Enable the chat.useAgentSkills setting in VS Code for Agent Skills support.');
+  }
 }
