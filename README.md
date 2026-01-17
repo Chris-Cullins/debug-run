@@ -34,17 +34,13 @@ npx debug-run --help
 
 ### Claude Code Skill (Recommended)
 
-To enable Claude Code to use debug-run effectively, copy the skill to your skills directory:
+To enable Claude Code to use debug-run effectively, install the skill:
 
 ```bash
-# Create skills directory if it doesn't exist
-mkdir -p ~/.claude/skills
-
-# Copy the debug-run skill
-cp -r node_modules/debug-run/.claude/skills/debug-run ~/.claude/skills/
+debug-run install-skill
 ```
 
-This installs the skill which teaches Claude how to use debug-run for debugging .NET, Python, and TypeScript applications. The skill includes:
+This copies the skill files to `~/.claude/skills/debug-run/`, teaching Claude how to use debug-run for debugging .NET, Python, and TypeScript applications. The skill includes:
 - `SKILL.md` - Main skill with options reference and best practices
 - `DOTNET.md` - .NET-specific guide (vsdbg, ASP.NET, NUnit)
 - `PYTHON.md` - Python-specific guide (debugpy)

@@ -259,6 +259,14 @@ export function createCli(): Command {
       await installAdapter(name);
     });
 
+  // Add install-skill subcommand
+  program
+    .command('install-skill')
+    .description('Install the Claude Code skill for debug-run to ~/.claude/skills/')
+    .action(async () => {
+      await installSkill();
+    });
+
   return program;
 }
 
@@ -516,4 +524,62 @@ async function installAdapter(name: string): Promise<void> {
     console.error(`Available adapters: ${getAdapterNames().join(', ')}`);
     process.exit(1);
   }
+}
+
+async function installSkill(): Promise<void> {
+  const os = await import('node:os');
+  const path = await import('node:path');
+
+  const homeDir = os.homedir();
+  const targetDir = path.join(homeDir, '.claude', 'skills', 'debug-run');
+
+  // Find the skill source directory (relative to this module)
+  const moduleDir = path.dirname(new URL(import.meta.url).pathname);
+  // In built version, we're in dist/, skills are in ../.claude/skills/
+  // Try multiple possible locations
+  const possibleSources = [
+    path.join(moduleDir, '..', '.claude', 'skills', 'debug-run'),
+    path.join(moduleDir, '.claude', 'skills', 'debug-run'),
+    path.join(process.cwd(), '.claude', 'skills', 'debug-run'),
+  ];
+
+  let sourceDir: string | null = null;
+  for (const src of possibleSources) {
+    if (fs.existsSync(path.join(src, 'SKILL.md'))) {
+      sourceDir = src;
+      break;
+    }
+  }
+
+  if (!sourceDir) {
+    console.error('Error: Could not find skill files.');
+    console.error('Expected to find SKILL.md in .claude/skills/debug-run/');
+    process.exit(1);
+  }
+
+  // Create target directory
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  // Copy skill files
+  const files = ['SKILL.md', 'DOTNET.md', 'PYTHON.md', 'TYPESCRIPT.md'];
+  let copiedCount = 0;
+
+  for (const file of files) {
+    const srcPath = path.join(sourceDir, file);
+    const destPath = path.join(targetDir, file);
+
+    if (fs.existsSync(srcPath)) {
+      fs.copyFileSync(srcPath, destPath);
+      copiedCount++;
+    }
+  }
+
+  console.log(`Installed debug-run skill to: ${targetDir}`);
+  console.log(`Copied ${copiedCount} files:`);
+  for (const file of files) {
+    if (fs.existsSync(path.join(targetDir, file))) {
+      console.log(`  - ${file}`);
+    }
+  }
+  console.log('\nClaude Code will now use this skill when debugging.');
 }
