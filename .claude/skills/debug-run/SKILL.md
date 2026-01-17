@@ -18,10 +18,14 @@ Use the `debug-run` CLI tool to programmatically debug applications via the Debu
 
 ## Prerequisites
 
-Ensure debug-run is installed in the project:
+debug-run is available via npx (no installation required) or can be installed globally:
 
 ```bash
-npm install  # in the debug-run directory
+# Run directly with npx
+npx debug-run --help
+
+# Or install globally
+npm install -g debug-run
 ```
 
 Check available adapters:

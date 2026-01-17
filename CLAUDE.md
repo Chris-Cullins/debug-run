@@ -2,17 +2,26 @@
 
 A CLI tool that enables AI agents to programmatically debug code via the Debug Adapter Protocol (DAP).
 
-## Quick Start
+## Usage
+
+```bash
+# Run directly with npx (no install needed)
+npx debug-run --help
+
+# List available debug adapters
+npx debug-run list-adapters
+```
+
+## Development Setup
+
+If working on the debug-run codebase itself:
 
 ```bash
 # Install dependencies (automatically builds)
 npm install
 
-# Run the CLI
-npx debug-run --help
-
-# List available debug adapters
-npx debug-run list-adapters
+# Run from source
+npx tsx ./src/index.ts --help
 ```
 
 ## Building the Sample .NET App
