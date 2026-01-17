@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'  # npm 11.5.1+ required for trusted publishing
           registry-url: 'https://registry.npmjs.org'
 
       - name: Get package version
