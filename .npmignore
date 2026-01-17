@@ -15,7 +15,10 @@ vitest.config.ts
 .husky/
 .vscode/
 .idea/
-.claude/
+
+# Claude config (but keep skills/)
+.claude/*
+!.claude/skills/
 
 # Config files
 .eslintrc*
@@ -23,11 +26,12 @@ vitest.config.ts
 .editorconfig
 CLAUDE.md
 
-# Documentation (keep only README.md)
+# Documentation (keep README.md and skill docs)
 docs/
 adapters/
-*.md
+/*.md
 !README.md
+!.claude/skills/**/*.md
 
 # Planning/internal docs
 FUTURE_IDEAS.md

@@ -25,17 +25,38 @@ Agents can write and run code, but when something goes wrong, they're blind. The
 ## Installation
 
 ```bash
-# Clone and install
+# Install globally
+npm install -g debug-run
+
+# Or run directly with npx
+npx debug-run --help
+```
+
+### Claude Code Skill (Recommended)
+
+To enable Claude Code to use debug-run effectively, copy the skill to your skills directory:
+
+```bash
+# Create skills directory if it doesn't exist
+mkdir -p ~/.claude/skills
+
+# Copy the debug-run skill
+cp -r node_modules/debug-run/.claude/skills/debug-run ~/.claude/skills/
+```
+
+This installs the skill which teaches Claude how to use debug-run for debugging .NET, Python, and TypeScript applications. The skill includes:
+- `SKILL.md` - Main skill with options reference and best practices
+- `DOTNET.md` - .NET-specific guide (vsdbg, ASP.NET, NUnit)
+- `PYTHON.md` - Python-specific guide (debugpy)
+- `TYPESCRIPT.md` - TypeScript/JavaScript guide (js-debug)
+
+### Development Setup
+
+```bash
 git clone https://github.com/Chris-Cullins/debug-run.git
 cd debug-run
 npm install
-
-# Run via tsx (development)
-npx tsx ./src/index.ts --help
-
-# Or build and run
-npm run build
-node dist/index.js --help
+npx tsx ./src/index.ts --help  # run from source
 ```
 
 ## Quick Start
@@ -43,13 +64,13 @@ node dist/index.js --help
 ### List available adapters
 
 ```bash
-npx tsx ./src/index.ts list-adapters
+npx debug-run list-adapters
 ```
 
 ### Debug a .NET application
 
 ```bash
-npx tsx ./src/index.ts ./bin/Debug/net8.0/MyApp.dll \
+npx debug-run ./bin/Debug/net8.0/MyApp.dll \
   -a dotnet \
   -b "src/OrderService.cs:45" \
   --pretty
@@ -58,7 +79,7 @@ npx tsx ./src/index.ts ./bin/Debug/net8.0/MyApp.dll \
 ### Debug Python
 
 ```bash
-npx tsx ./src/index.ts ./main.py \
+npx debug-run ./main.py \
   -a python \
   -b "processor.py:123" \
   -e "data.count" \
@@ -68,7 +89,7 @@ npx tsx ./src/index.ts ./main.py \
 ### Debug Node.js
 
 ```bash
-npx tsx ./src/index.ts ./dist/index.js \
+npx debug-run ./dist/index.js \
   -a node \
   -b "src/handler.ts:30" \
   --pretty
@@ -182,7 +203,7 @@ debug-run outputs newline-delimited JSON (NDJSON) events:
 ### Checking adapter status
 
 ```bash
-$ npx tsx ./src/index.ts list-adapters
+$ npx debug-run list-adapters
 
 Available debug adapters:
 
@@ -208,7 +229,7 @@ Available debug adapters:
 ### Investigate a test failure
 
 ```bash
-npx tsx ./src/index.ts ./bin/Debug/net8.0/TestApp.dll \
+npx debug-run ./bin/Debug/net8.0/TestApp.dll \
   -a dotnet \
   -b "src/InventoryService.cs:34" \
   -e "requestedQuantity" \
@@ -219,7 +240,7 @@ npx tsx ./src/index.ts ./bin/Debug/net8.0/TestApp.dll \
 ### Step through code
 
 ```bash
-npx tsx ./src/index.ts ./app.dll \
+npx debug-run ./app.dll \
   -a dotnet \
   -b "src/PricingService.cs:45" \
   --steps 10 \
@@ -230,7 +251,7 @@ npx tsx ./src/index.ts ./app.dll \
 ### Break on exceptions
 
 ```bash
-npx tsx ./src/index.ts ./app.dll \
+npx debug-run ./app.dll \
   -a dotnet \
   --break-on-exception "all" \
   --pretty
@@ -239,7 +260,7 @@ npx tsx ./src/index.ts ./app.dll \
 ### Conditional breakpoint
 
 ```bash
-npx tsx ./src/index.ts ./app.dll \
+npx debug-run ./app.dll \
   -a dotnet \
   -b "src/OrderService.cs:67?order.Total > 1000" \
   --pretty
@@ -250,7 +271,7 @@ npx tsx ./src/index.ts ./app.dll \
 Declare invariants that must remain true. The debugger halts immediately when any assertion fails:
 
 ```bash
-npx tsx ./src/index.ts ./app.dll \
+npx debug-run ./app.dll \
   -a dotnet \
   -b "src/OrderService.cs:45" \
   --assert "order.Total >= 0" \
@@ -272,7 +293,7 @@ Assertions are checked at breakpoints, during stepping, and during trace mode.
 Automatically step through code after hitting a breakpoint:
 
 ```bash
-npx tsx ./src/index.ts ./app.dll \
+npx debug-run ./app.dll \
   -a dotnet \
   -b "src/OrderService.cs:45" \
   --trace \
@@ -295,7 +316,7 @@ import subprocess
 import json
 
 result = subprocess.run([
-    "npx", "tsx", "./src/index.ts",
+    "npx", "debug-run",
     "./bin/Debug/net8.0/MyApp.dll",
     "-a", "dotnet",
     "-b", "src/Service.cs:45",
@@ -316,7 +337,7 @@ for line in result.stdout.strip().split('\n'):
 # Install dependencies
 npm install
 
-# Run in development mode
+# Run from source
 npx tsx ./src/index.ts [args...]
 
 # Type check
