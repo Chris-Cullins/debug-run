@@ -1,6 +1,6 @@
 {
   "name": "debug-run",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "description": "CLI tool enabling AI agents to programmatically debug code via DAP",
   "type": "module",
   "main": "dist/index.cjs",
