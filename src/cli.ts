@@ -267,9 +267,11 @@ export function createCli(): Command {
     .option('--copilot', 'Install to GitHub Copilot (~/.copilot/skills/)')
     .option('--project', 'Install to project directory instead of user home')
     .option('--dir <path>', 'Install to custom directory')
-    .action(async (options: { claude?: boolean; copilot?: boolean; project?: boolean; dir?: string }) => {
-      await installSkill(options);
-    });
+    .action(
+      async (options: { claude?: boolean; copilot?: boolean; project?: boolean; dir?: string }) => {
+        await installSkill(options);
+      }
+    );
 
   return program;
 }
@@ -545,7 +547,7 @@ interface SkillTarget {
 function getSkillTargets(options: InstallSkillOptions): SkillTarget[] {
   const os = require('node:os');
   const path = require('node:path');
-  
+
   const homeDir = os.homedir();
   const projectDir = process.cwd();
   const targets: SkillTarget[] = [];
@@ -624,7 +626,7 @@ async function installSkill(options: InstallSkillOptions = {}): Promise<void> {
 
   // Get target directories based on options
   const targets = getSkillTargets(options);
-  
+
   if (targets.length === 0) {
     console.error('Error: No installation target specified.');
     console.error('Use --claude, --copilot, --project, or --dir <path>');
@@ -661,12 +663,14 @@ async function installSkill(options: InstallSkillOptions = {}): Promise<void> {
   }
 
   // Print usage hints based on targets
-  const targetNames = targets.map(t => t.name);
-  if (targetNames.some(n => n.includes('Claude'))) {
+  const targetNames = targets.map((t) => t.name);
+  if (targetNames.some((n) => n.includes('Claude'))) {
     console.log('Claude Code will now use this skill when debugging.');
   }
-  if (targetNames.some(n => n.includes('Copilot'))) {
+  if (targetNames.some((n) => n.includes('Copilot'))) {
     console.log('GitHub Copilot will now use this skill when debugging.');
-    console.log('Note: Enable the chat.useAgentSkills setting in VS Code for Agent Skills support.');
+    console.log(
+      'Note: Enable the chat.useAgentSkills setting in VS Code for Agent Skills support.'
+    );
   }
 }
