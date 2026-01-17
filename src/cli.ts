@@ -599,9 +599,11 @@ function getSkillTargets(options: InstallSkillOptions): SkillTarget[] {
 
 async function installSkill(options: InstallSkillOptions = {}): Promise<void> {
   const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
 
   // Find the skill source directory (relative to this module)
-  const moduleDir = path.dirname(new URL(import.meta.url).pathname);
+  // Use fileURLToPath for cross-platform compatibility (Windows needs this)
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   // In built version, we're in dist/, skills are in ../.claude/skills/
   // Try multiple possible locations
   const possibleSources = [

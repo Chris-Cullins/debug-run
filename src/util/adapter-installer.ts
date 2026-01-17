@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
+import { fileURLToPath } from 'node:url';
 
 const execAsync = promisify(exec);
 
@@ -93,9 +94,8 @@ function getDownloadUrl(): string {
  */
 export function getAdaptersDir(): string {
   // Use a directory relative to the package
-  // import.meta.url gives us file:///path/to/adapter-installer.ts
-  const currentFileUrl = import.meta.url;
-  const currentFilePath = new URL(currentFileUrl).pathname;
+  // Use fileURLToPath for cross-platform compatibility (Windows needs this)
+  const currentFilePath = fileURLToPath(import.meta.url);
   const packageRoot = path.resolve(path.dirname(currentFilePath), '..', '..');
   return path.join(packageRoot, 'bin', 'adapters');
 }
