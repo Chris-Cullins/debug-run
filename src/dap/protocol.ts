@@ -8,17 +8,17 @@
 // Base message types
 export interface ProtocolMessage {
   seq: number;
-  type: "request" | "response" | "event";
+  type: 'request' | 'response' | 'event';
 }
 
 export interface Request extends ProtocolMessage {
-  type: "request";
+  type: 'request';
   command: string;
   arguments?: unknown;
 }
 
 export interface Response extends ProtocolMessage {
-  type: "response";
+  type: 'response';
   request_seq: number;
   success: boolean;
   command: string;
@@ -27,7 +27,7 @@ export interface Response extends ProtocolMessage {
 }
 
 export interface Event extends ProtocolMessage {
-  type: "event";
+  type: 'event';
   event: string;
   body?: unknown;
 }
@@ -88,7 +88,7 @@ export interface StackFrame {
   endLine?: number;
   endColumn?: number;
   moduleId?: number | string;
-  presentationHint?: "normal" | "label" | "subtle";
+  presentationHint?: 'normal' | 'label' | 'subtle';
 }
 
 export interface Scope {
@@ -138,7 +138,7 @@ export interface InitializeRequestArguments {
   locale?: string;
   linesStartAt1?: boolean;
   columnsStartAt1?: boolean;
-  pathFormat?: "path" | "uri";
+  pathFormat?: 'path' | 'uri';
   supportsVariableType?: boolean;
   supportsVariablePaging?: boolean;
   supportsRunInTerminalRequest?: boolean;
@@ -184,7 +184,7 @@ export interface ScopesArguments {
 
 export interface VariablesArguments {
   variablesReference: number;
-  filter?: "indexed" | "named";
+  filter?: 'indexed' | 'named';
   start?: number;
   count?: number;
 }
@@ -192,7 +192,7 @@ export interface VariablesArguments {
 export interface EvaluateArguments {
   expression: string;
   frameId?: number;
-  context?: "watch" | "repl" | "hover" | "clipboard";
+  context?: 'watch' | 'repl' | 'hover' | 'clipboard';
 }
 
 export interface ContinueArguments {
@@ -203,20 +203,20 @@ export interface ContinueArguments {
 export interface NextArguments {
   threadId: number;
   singleThread?: boolean;
-  granularity?: "statement" | "line" | "instruction";
+  granularity?: 'statement' | 'line' | 'instruction';
 }
 
 export interface StepInArguments {
   threadId: number;
   singleThread?: boolean;
   targetId?: number;
-  granularity?: "statement" | "line" | "instruction";
+  granularity?: 'statement' | 'line' | 'instruction';
 }
 
 export interface StepOutArguments {
   threadId: number;
   singleThread?: boolean;
-  granularity?: "statement" | "line" | "instruction";
+  granularity?: 'statement' | 'line' | 'instruction';
 }
 
 // Response bodies
@@ -260,15 +260,15 @@ export interface ContinueResponse {
 // Event bodies
 export interface StoppedEventBody {
   reason:
-    | "step"
-    | "breakpoint"
-    | "exception"
-    | "pause"
-    | "entry"
-    | "goto"
-    | "function breakpoint"
-    | "data breakpoint"
-    | "instruction breakpoint"
+    | 'step'
+    | 'breakpoint'
+    | 'exception'
+    | 'pause'
+    | 'entry'
+    | 'goto'
+    | 'function breakpoint'
+    | 'data breakpoint'
+    | 'instruction breakpoint'
     | string;
   description?: string;
   threadId?: number;
@@ -287,9 +287,9 @@ export interface ExitedEventBody {
 }
 
 export interface OutputEventBody {
-  category?: "console" | "important" | "stdout" | "stderr" | "telemetry";
+  category?: 'console' | 'important' | 'stdout' | 'stderr' | 'telemetry';
   output: string;
-  group?: "start" | "startCollapsed" | "end";
+  group?: 'start' | 'startCollapsed' | 'end';
   variablesReference?: number;
   source?: Source;
   line?: number;
@@ -298,6 +298,6 @@ export interface OutputEventBody {
 }
 
 export interface BreakpointEventBody {
-  reason: "changed" | "new" | "removed";
+  reason: 'changed' | 'new' | 'removed';
   breakpoint: Breakpoint;
 }

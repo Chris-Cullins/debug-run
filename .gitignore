@@ -41,6 +41,11 @@ samples/dotnet/bin/
 samples/dotnet/obj/
 samples/aspnet/*/bin/
 samples/aspnet/*/obj/
+samples/nunit/bin/
+samples/nunit/obj/
+samples/enterprise/bin/
+samples/enterprise/obj/
+samples/rust/target/
 
 # Debugger history files
 .netcoredbg_hist

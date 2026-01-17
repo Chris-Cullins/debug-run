@@ -4,10 +4,10 @@
  * High-level client wrapping the transport layer with typed DAP methods.
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
-import { EventEmitter } from "node:events";
-import { DapTransport } from "./transport.js";
-import { signHandshake } from "../util/vsda-signer.js";
+import { spawn, type ChildProcess } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import { DapTransport } from './transport.js';
+import { signHandshake } from '../util/vsda-signer.js';
 import type {
   Request,
   InitializeRequestArguments,
@@ -38,7 +38,7 @@ import type {
   OutputEventBody,
   BreakpointEventBody,
   Event,
-} from "./protocol.js";
+} from './protocol.js';
 
 export interface DapClientOptions {
   /** Command to spawn the debug adapter */
@@ -70,60 +70,60 @@ export class DapClient extends EventEmitter {
    */
   async connect(): Promise<void> {
     if (this.transport) {
-      throw new Error("Already connected");
+      throw new Error('Already connected');
     }
 
     this.process = spawn(this.options.command, this.options.args || [], {
       cwd: this.options.cwd,
       env: { ...process.env, ...this.options.env },
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
 
     this.transport = new DapTransport(this.process, this.options.timeout);
 
     // Forward events
-    this.transport.on("event:stopped", (body: StoppedEventBody) => {
-      this.emit("stopped", body);
+    this.transport.on('event:stopped', (body: StoppedEventBody) => {
+      this.emit('stopped', body);
     });
 
-    this.transport.on("event:terminated", (body: TerminatedEventBody) => {
-      this.emit("terminated", body);
+    this.transport.on('event:terminated', (body: TerminatedEventBody) => {
+      this.emit('terminated', body);
     });
 
-    this.transport.on("event:exited", (body: ExitedEventBody) => {
-      this.emit("exited", body);
+    this.transport.on('event:exited', (body: ExitedEventBody) => {
+      this.emit('exited', body);
     });
 
-    this.transport.on("event:output", (body: OutputEventBody) => {
-      this.emit("output", body);
+    this.transport.on('event:output', (body: OutputEventBody) => {
+      this.emit('output', body);
     });
 
-    this.transport.on("event:breakpoint", (body: BreakpointEventBody) => {
-      this.emit("breakpoint", body);
+    this.transport.on('event:breakpoint', (body: BreakpointEventBody) => {
+      this.emit('breakpoint', body);
     });
 
-    this.transport.on("event:initialized", () => {
-      this.emit("initialized");
+    this.transport.on('event:initialized', () => {
+      this.emit('initialized');
     });
 
-    this.transport.on("event", (event: Event) => {
-      this.emit("event", event);
+    this.transport.on('event', (event: Event) => {
+      this.emit('event', event);
     });
 
-    this.transport.on("stderr", (data: string) => {
-      this.emit("stderr", data);
+    this.transport.on('stderr', (data: string) => {
+      this.emit('stderr', data);
     });
 
-    this.transport.on("exit", (code: number | null, signal: string | null) => {
-      this.emit("exit", code, signal);
+    this.transport.on('exit', (code: number | null, signal: string | null) => {
+      this.emit('exit', code, signal);
     });
 
-    this.transport.on("error", (error: Error) => {
-      this.emit("error", error);
+    this.transport.on('error', (error: Error) => {
+      this.emit('error', error);
     });
 
     // Handle vsdbg handshake reverse request
-    this.transport.on("reverseRequest:handshake", (request: Request) => {
+    this.transport.on('reverseRequest:handshake', (request: Request) => {
       this.handleHandshakeRequest(request);
     });
   }
@@ -136,7 +136,7 @@ export class DapClient extends EventEmitter {
     const challenge = args?.value;
 
     if (!challenge) {
-      this.sendReverseResponse(request, false, "No challenge value provided");
+      this.sendReverseResponse(request, false, 'No challenge value provided');
       return;
     }
 
@@ -145,7 +145,7 @@ export class DapClient extends EventEmitter {
       this.sendReverseResponse(request, true, undefined, { signature });
     } else {
       // If we can't sign, send empty response - vsdbg may still work
-      this.sendReverseResponse(request, true, undefined, { signature: "" });
+      this.sendReverseResponse(request, true, undefined, { signature: '' });
     }
   }
 
@@ -162,7 +162,7 @@ export class DapClient extends EventEmitter {
 
     const response = {
       seq: 0, // Will be set by transport
-      type: "response" as const,
+      type: 'response' as const,
       request_seq: request.seq,
       command: request.command,
       success,
@@ -188,14 +188,14 @@ export class DapClient extends EventEmitter {
     const initializedPromise = new Promise<void>((resolve) => {
       initializedResolve = resolve;
     });
-    this.once("initialized", () => initializedResolve());
+    this.once('initialized', () => initializedResolve());
 
-    const response = await this.transport!.sendRequest<InitializeResponse>("initialize", {
+    const response = await this.transport!.sendRequest<InitializeResponse>('initialize', {
       // Use VS Code identity for vsdbg compatibility
-      clientID: "vscode",
-      clientName: "Visual Studio Code",
-      adapterID: args.adapterID || "unknown",
-      pathFormat: "path",
+      clientID: 'vscode',
+      clientName: 'Visual Studio Code',
+      adapterID: args.adapterID || 'unknown',
+      pathFormat: 'path',
       linesStartAt1: true,
       columnsStartAt1: true,
       supportsVariableType: true,
@@ -208,7 +208,7 @@ export class DapClient extends EventEmitter {
 
     // Wait for the initialized event (with a timeout to handle adapters that don't send it)
     const timeoutPromise = new Promise<void>((_, reject) => {
-      setTimeout(() => reject(new Error("Timeout waiting for initialized event")), 10000);
+      setTimeout(() => reject(new Error('Timeout waiting for initialized event')), 10000);
     });
 
     try {
@@ -226,7 +226,7 @@ export class DapClient extends EventEmitter {
    */
   async launch(args: LaunchRequestArguments): Promise<void> {
     this.ensureInitialized();
-    await this.transport!.sendRequest("launch", args);
+    await this.transport!.sendRequest('launch', args);
   }
 
   /**
@@ -234,7 +234,7 @@ export class DapClient extends EventEmitter {
    */
   async attach(args: AttachRequestArguments): Promise<void> {
     this.ensureInitialized();
-    await this.transport!.sendRequest("attach", args);
+    await this.transport!.sendRequest('attach', args);
   }
 
   /**
@@ -242,7 +242,7 @@ export class DapClient extends EventEmitter {
    */
   async configurationDone(): Promise<void> {
     this.ensureInitialized();
-    await this.transport!.sendRequest("configurationDone");
+    await this.transport!.sendRequest('configurationDone');
   }
 
   /**
@@ -250,7 +250,7 @@ export class DapClient extends EventEmitter {
    */
   async setBreakpoints(args: SetBreakpointsArguments): Promise<SetBreakpointsResponse> {
     this.ensureInitialized();
-    return await this.transport!.sendRequest<SetBreakpointsResponse>("setBreakpoints", args);
+    return await this.transport!.sendRequest<SetBreakpointsResponse>('setBreakpoints', args);
   }
 
   /**
@@ -258,7 +258,7 @@ export class DapClient extends EventEmitter {
    */
   async setExceptionBreakpoints(args: SetExceptionBreakpointsArguments): Promise<void> {
     this.ensureInitialized();
-    await this.transport!.sendRequest("setExceptionBreakpoints", args);
+    await this.transport!.sendRequest('setExceptionBreakpoints', args);
   }
 
   /**
@@ -266,7 +266,7 @@ export class DapClient extends EventEmitter {
    */
   async threads(): Promise<ThreadsResponse> {
     this.ensureInitialized();
-    return await this.transport!.sendRequest<ThreadsResponse>("threads");
+    return await this.transport!.sendRequest<ThreadsResponse>('threads');
   }
 
   /**
@@ -274,7 +274,7 @@ export class DapClient extends EventEmitter {
    */
   async stackTrace(args: StackTraceArguments): Promise<StackTraceResponse> {
     this.ensureInitialized();
-    return await this.transport!.sendRequest<StackTraceResponse>("stackTrace", args);
+    return await this.transport!.sendRequest<StackTraceResponse>('stackTrace', args);
   }
 
   /**
@@ -282,7 +282,7 @@ export class DapClient extends EventEmitter {
    */
   async scopes(args: ScopesArguments): Promise<ScopesResponse> {
     this.ensureInitialized();
-    return await this.transport!.sendRequest<ScopesResponse>("scopes", args);
+    return await this.transport!.sendRequest<ScopesResponse>('scopes', args);
   }
 
   /**
@@ -290,7 +290,7 @@ export class DapClient extends EventEmitter {
    */
   async variables(args: VariablesArguments): Promise<VariablesResponse> {
     this.ensureInitialized();
-    return await this.transport!.sendRequest<VariablesResponse>("variables", args);
+    return await this.transport!.sendRequest<VariablesResponse>('variables', args);
   }
 
   /**
@@ -298,7 +298,7 @@ export class DapClient extends EventEmitter {
    */
   async evaluate(args: EvaluateArguments): Promise<EvaluateResponse> {
     this.ensureInitialized();
-    return await this.transport!.sendRequest<EvaluateResponse>("evaluate", args);
+    return await this.transport!.sendRequest<EvaluateResponse>('evaluate', args);
   }
 
   /**
@@ -306,7 +306,7 @@ export class DapClient extends EventEmitter {
    */
   async continue(args: ContinueArguments): Promise<ContinueResponse> {
     this.ensureInitialized();
-    return await this.transport!.sendRequest<ContinueResponse>("continue", args);
+    return await this.transport!.sendRequest<ContinueResponse>('continue', args);
   }
 
   /**
@@ -314,7 +314,7 @@ export class DapClient extends EventEmitter {
    */
   async next(args: NextArguments): Promise<void> {
     this.ensureInitialized();
-    await this.transport!.sendRequest("next", args);
+    await this.transport!.sendRequest('next', args);
   }
 
   /**
@@ -322,7 +322,7 @@ export class DapClient extends EventEmitter {
    */
   async stepIn(args: StepInArguments): Promise<void> {
     this.ensureInitialized();
-    await this.transport!.sendRequest("stepIn", args);
+    await this.transport!.sendRequest('stepIn', args);
   }
 
   /**
@@ -330,7 +330,7 @@ export class DapClient extends EventEmitter {
    */
   async stepOut(args: StepOutArguments): Promise<void> {
     this.ensureInitialized();
-    await this.transport!.sendRequest("stepOut", args);
+    await this.transport!.sendRequest('stepOut', args);
   }
 
   /**
@@ -338,7 +338,7 @@ export class DapClient extends EventEmitter {
    */
   async pause(threadId: number): Promise<void> {
     this.ensureInitialized();
-    await this.transport!.sendRequest("pause", { threadId });
+    await this.transport!.sendRequest('pause', { threadId });
   }
 
   /**
@@ -351,7 +351,7 @@ export class DapClient extends EventEmitter {
     if (!this.transport?.isOpen()) return;
 
     try {
-      await this.transport.sendRequest("disconnect", {
+      await this.transport.sendRequest('disconnect', {
         restart,
         terminateDebuggee,
       });
@@ -369,7 +369,7 @@ export class DapClient extends EventEmitter {
     if (!this.transport?.isOpen()) return;
 
     try {
-      await this.transport.sendRequest("terminate");
+      await this.transport.sendRequest('terminate');
     } catch {
       // Ignore errors during terminate
     }
@@ -391,14 +391,14 @@ export class DapClient extends EventEmitter {
 
   private ensureConnected(): void {
     if (!this.transport) {
-      throw new Error("Not connected. Call connect() first.");
+      throw new Error('Not connected. Call connect() first.');
     }
   }
 
   private ensureInitialized(): void {
     this.ensureConnected();
     if (!this.initialized) {
-      throw new Error("Not initialized. Call initialize() first.");
+      throw new Error('Not initialized. Call initialize() first.');
     }
   }
 }

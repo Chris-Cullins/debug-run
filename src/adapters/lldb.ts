@@ -5,25 +5,25 @@
  * Supports both lldb-dap (official LLVM adapter) and CodeLLDB (VS Code extension).
  */
 
-import * as path from "node:path";
-import * as fs from "node:fs";
-import type { AdapterConfig, LaunchOptions, AttachOptions } from "./base.js";
-import { commandExists } from "./base.js";
-import { findCodeLLDB } from "../util/vscode-adapters.js";
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import type { AdapterConfig, LaunchOptions, AttachOptions } from './base.js';
+import { commandExists } from './base.js';
+import { findCodeLLDB } from '../util/vscode-adapters.js';
 
 /**
  * Check common Homebrew LLVM installation paths on macOS.
  * Homebrew LLVM is "keg-only" and not symlinked to PATH by default.
  */
 function findHomebrewLLDB(): string | null {
-  if (process.platform !== "darwin") {
+  if (process.platform !== 'darwin') {
     return null;
   }
 
   // Homebrew paths: Apple Silicon vs Intel
   const homebrewPaths = [
-    "/opt/homebrew/opt/llvm/bin/lldb-dap",  // Apple Silicon
-    "/usr/local/opt/llvm/bin/lldb-dap",      // Intel Mac
+    '/opt/homebrew/opt/llvm/bin/lldb-dap', // Apple Silicon
+    '/usr/local/opt/llvm/bin/lldb-dap', // Intel Mac
   ];
 
   for (const p of homebrewPaths) {
@@ -37,19 +37,19 @@ function findHomebrewLLDB(): string | null {
 
 // Cache the detected path and type
 let cachedPath: string | null = null;
-let cachedType: "lldb-dap" | "codelldb" | null = null;
+let cachedType: 'lldb-dap' | 'codelldb' | null = null;
 
 export const lldbAdapter: AdapterConfig = {
-  id: "lldb",
-  name: "lldb",
+  id: 'lldb',
+  name: 'lldb',
 
   get command() {
-    return cachedPath || "lldb-dap";
+    return cachedPath || 'lldb-dap';
   },
 
   get args() {
     // CodeLLDB requires specific args
-    if (cachedType === "codelldb") {
+    if (cachedType === 'codelldb') {
       return [];
     }
     return [];
@@ -57,18 +57,18 @@ export const lldbAdapter: AdapterConfig = {
 
   detect: async () => {
     // Try lldb-dap first (official LLVM DAP adapter, previously lldb-vscode)
-    const lldbDap = await commandExists("lldb-dap");
+    const lldbDap = await commandExists('lldb-dap');
     if (lldbDap) {
       cachedPath = lldbDap;
-      cachedType = "lldb-dap";
+      cachedType = 'lldb-dap';
       return lldbDap;
     }
 
     // Try the older name lldb-vscode (for older LLVM versions)
-    const lldbVscode = await commandExists("lldb-vscode");
+    const lldbVscode = await commandExists('lldb-vscode');
     if (lldbVscode) {
       cachedPath = lldbVscode;
-      cachedType = "lldb-dap";
+      cachedType = 'lldb-dap';
       return lldbVscode;
     }
 
@@ -76,7 +76,7 @@ export const lldbAdapter: AdapterConfig = {
     const homebrewLldb = findHomebrewLLDB();
     if (homebrewLldb) {
       cachedPath = homebrewLldb;
-      cachedType = "lldb-dap";
+      cachedType = 'lldb-dap';
       return homebrewLldb;
     }
 
@@ -84,7 +84,7 @@ export const lldbAdapter: AdapterConfig = {
     const codeLldbPath = findCodeLLDB();
     if (codeLldbPath) {
       cachedPath = codeLldbPath;
-      cachedType = "codelldb";
+      cachedType = 'codelldb';
       return codeLldbPath;
     }
 
@@ -117,9 +117,9 @@ Options:
 
   launchConfig: (options: LaunchOptions) => {
     const config: Record<string, unknown> = {
-      name: "LLDB Launch",
-      type: cachedType === "codelldb" ? "lldb" : "lldb-dap",
-      request: "launch",
+      name: 'LLDB Launch',
+      type: cachedType === 'codelldb' ? 'lldb' : 'lldb-dap',
+      request: 'launch',
       program: path.resolve(options.program),
       args: options.args || [],
       cwd: options.cwd || path.dirname(path.resolve(options.program)),
@@ -128,25 +128,25 @@ Options:
     };
 
     // CodeLLDB-specific options
-    if (cachedType === "codelldb") {
-      config.terminal = "console";
+    if (cachedType === 'codelldb') {
+      config.terminal = 'console';
     }
 
     return config;
   },
 
   attachConfig: (options: AttachOptions) => ({
-    name: "LLDB Attach",
-    type: cachedType === "codelldb" ? "lldb" : "lldb-dap",
-    request: "attach",
+    name: 'LLDB Attach',
+    type: cachedType === 'codelldb' ? 'lldb' : 'lldb-dap',
+    request: 'attach',
     pid: options.pid,
   }),
 
   exceptionFilters: [
-    "cpp_throw",    // Break on C++ throw
-    "cpp_catch",    // Break on C++ catch
-    "objc_throw",   // Break on Objective-C @throw
-    "objc_catch",   // Break on Objective-C @catch
-    "swift_throw",  // Break on Swift throw
+    'cpp_throw', // Break on C++ throw
+    'cpp_catch', // Break on C++ catch
+    'objc_throw', // Break on Objective-C @throw
+    'objc_catch', // Break on Objective-C @catch
+    'swift_throw', // Break on Swift throw
   ],
 };

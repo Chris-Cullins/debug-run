@@ -4,7 +4,7 @@
  * Common interface implemented by both stdio and socket-based clients.
  */
 
-import type { EventEmitter } from "node:events";
+import type { EventEmitter } from 'node:events';
 import type {
   InitializeRequestArguments,
   LaunchRequestArguments,
@@ -27,7 +27,7 @@ import type {
   StepInArguments,
   StepOutArguments,
   Capabilities,
-} from "./protocol.js";
+} from './protocol.js';
 
 export interface IDapClient extends EventEmitter {
   connect(): Promise<void>;

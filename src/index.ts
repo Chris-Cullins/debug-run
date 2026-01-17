@@ -8,7 +8,7 @@
  * that agents can parse and act on.
  */
 
-import { createCli } from "./cli.js";
+import { createCli } from './cli.js';
 
 const cli = createCli();
 cli.parse();

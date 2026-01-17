@@ -4,23 +4,23 @@
  * Central registry for all supported debug adapters.
  */
 
-export * from "./base.js";
-export * from "./netcoredbg.js";
-export * from "./vsdbg.js";
-export * from "./debugpy.js";
-export * from "./node.js";
-export * from "./lldb.js";
+export * from './base.js';
+export * from './netcoredbg.js';
+export * from './vsdbg.js';
+export * from './debugpy.js';
+export * from './node.js';
+export * from './lldb.js';
 
-import * as path from "node:path";
-import type { AdapterConfig, LaunchOptions, AttachOptions } from "./base.js";
-import { netcoredbgAdapter } from "./netcoredbg.js";
-import { vsdbgAdapter } from "./vsdbg.js";
-import { debugpyAdapter } from "./debugpy.js";
-import { nodeAdapter } from "./node.js";
-import { lldbAdapter } from "./lldb.js";
-import { findVsdbg } from "../util/vscode-adapters.js";
-import { isNetcoredbgInstalled, getNetcoredbgPath } from "../util/adapter-installer.js";
-import { commandExists } from "./base.js";
+import * as path from 'node:path';
+import type { AdapterConfig, LaunchOptions, AttachOptions } from './base.js';
+import { netcoredbgAdapter } from './netcoredbg.js';
+import { vsdbgAdapter } from './vsdbg.js';
+import { debugpyAdapter } from './debugpy.js';
+import { nodeAdapter } from './node.js';
+import { lldbAdapter } from './lldb.js';
+import { findVsdbg } from '../util/vscode-adapters.js';
+import { isNetcoredbgInstalled, getNetcoredbgPath } from '../util/adapter-installer.js';
+import { commandExists } from './base.js';
 
 /**
  * Smart .NET adapter that tries multiple debuggers in order:
@@ -31,15 +31,15 @@ import { commandExists } from "./base.js";
 let dotnetCachedPath: string | null = null;
 
 const dotnetAdapter: AdapterConfig = {
-  id: "coreclr",
-  name: "dotnet",
+  id: 'coreclr',
+  name: 'dotnet',
 
   get command() {
-    return dotnetCachedPath || "vsdbg";
+    return dotnetCachedPath || 'vsdbg';
   },
 
   get args() {
-    return ["--interpreter=vscode"];
+    return ['--interpreter=vscode'];
   },
 
   detect: async () => {
@@ -57,7 +57,7 @@ const dotnetAdapter: AdapterConfig = {
     }
 
     // Try system netcoredbg
-    const systemPath = await commandExists("netcoredbg");
+    const systemPath = await commandExists('netcoredbg');
     if (systemPath) {
       dotnetCachedPath = systemPath;
       return systemPath;
@@ -83,15 +83,15 @@ const dotnetAdapter: AdapterConfig = {
 `.trim(),
 
   launchConfig: (options: LaunchOptions) => ({
-    name: ".NET Core Launch",
-    type: "coreclr",
-    request: "launch",
+    name: '.NET Core Launch',
+    type: 'coreclr',
+    request: 'launch',
     program: path.resolve(options.program),
     args: options.args || [],
     cwd: options.cwd || path.dirname(path.resolve(options.program)),
     env: options.env || {},
     stopAtEntry: options.stopAtEntry || false,
-    console: "internalConsole",
+    console: 'internalConsole',
     // vsdbg-specific options (ignored by netcoredbg)
     justMyCode: true,
     enableStepFiltering: true,
@@ -102,43 +102,40 @@ const dotnetAdapter: AdapterConfig = {
   }),
 
   attachConfig: (options: AttachOptions) => ({
-    name: ".NET Core Attach",
-    type: "coreclr",
-    request: "attach",
+    name: '.NET Core Attach',
+    type: 'coreclr',
+    request: 'attach',
     processId: options.pid,
   }),
 
-  exceptionFilters: [
-    "all",
-    "user-unhandled",
-  ],
+  exceptionFilters: ['all', 'user-unhandled'],
 };
 
 const adapters: Map<string, AdapterConfig> = new Map([
   // Smart .NET adapter (tries vsdbg, then netcoredbg)
-  ["dotnet", dotnetAdapter],
-  ["coreclr", dotnetAdapter],
+  ['dotnet', dotnetAdapter],
+  ['coreclr', dotnetAdapter],
 
   // Specific .NET adapters
-  ["netcoredbg", netcoredbgAdapter],
-  ["vsdbg", vsdbgAdapter],
+  ['netcoredbg', netcoredbgAdapter],
+  ['vsdbg', vsdbgAdapter],
 
   // Python
-  ["debugpy", debugpyAdapter],
-  ["python", debugpyAdapter],
+  ['debugpy', debugpyAdapter],
+  ['python', debugpyAdapter],
 
   // Node.js / JavaScript
-  ["node", nodeAdapter],
-  ["nodejs", nodeAdapter],
-  ["javascript", nodeAdapter],
-  ["js", nodeAdapter],
+  ['node', nodeAdapter],
+  ['nodejs', nodeAdapter],
+  ['javascript', nodeAdapter],
+  ['js', nodeAdapter],
 
   // LLDB (C/C++/Rust/Swift)
-  ["lldb", lldbAdapter],
-  ["codelldb", lldbAdapter],
-  ["cpp", lldbAdapter],
-  ["c", lldbAdapter],
-  ["rust", lldbAdapter],
+  ['lldb', lldbAdapter],
+  ['codelldb', lldbAdapter],
+  ['cpp', lldbAdapter],
+  ['c', lldbAdapter],
+  ['rust', lldbAdapter],
 ]);
 
 /**

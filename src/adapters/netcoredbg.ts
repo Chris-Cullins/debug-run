@@ -5,10 +5,10 @@
  * https://github.com/Samsung/netcoredbg
  */
 
-import * as path from "node:path";
-import type { AdapterConfig, LaunchOptions, AttachOptions } from "./base.js";
-import { commandExists } from "./base.js";
-import { getNetcoredbgPath, isNetcoredbgInstalled } from "../util/adapter-installer.js";
+import * as path from 'node:path';
+import type { AdapterConfig, LaunchOptions, AttachOptions } from './base.js';
+import { commandExists } from './base.js';
+import { getNetcoredbgPath, isNetcoredbgInstalled } from '../util/adapter-installer.js';
 
 /**
  * Find the netcoredbg executable, checking bundled location first
@@ -20,22 +20,22 @@ async function findNetcoredbg(): Promise<string | null> {
   }
 
   // Fall back to system PATH
-  return await commandExists("netcoredbg");
+  return await commandExists('netcoredbg');
 }
 
 // Cache the detected path
 let cachedPath: string | null = null;
 
 export const netcoredbgAdapter: AdapterConfig = {
-  id: "coreclr",
-  name: "netcoredbg",
+  id: 'coreclr',
+  name: 'netcoredbg',
 
   // This will be updated by detect()
   get command() {
-    return cachedPath || "netcoredbg";
+    return cachedPath || 'netcoredbg';
   },
 
-  args: ["--interpreter=vscode"],
+  args: ['--interpreter=vscode'],
 
   detect: async () => {
     cachedPath = await findNetcoredbg();
@@ -62,26 +62,26 @@ Install netcoredbg:
 `.trim(),
 
   launchConfig: (options: LaunchOptions) => ({
-    name: ".NET Core Launch",
-    type: "coreclr",
-    request: "launch",
+    name: '.NET Core Launch',
+    type: 'coreclr',
+    request: 'launch',
     program: path.resolve(options.program),
     args: options.args || [],
     cwd: options.cwd || path.dirname(options.program),
     env: options.env || {},
     stopAtEntry: options.stopAtEntry || false,
-    console: "internalConsole",
+    console: 'internalConsole',
   }),
 
   attachConfig: (options: AttachOptions) => ({
-    name: ".NET Core Attach",
-    type: "coreclr",
-    request: "attach",
+    name: '.NET Core Attach',
+    type: 'coreclr',
+    request: 'attach',
     processId: options.pid,
   }),
 
   exceptionFilters: [
-    "all",           // Break on all exceptions
-    "user-unhandled", // Break on user-unhandled exceptions
+    'all', // Break on all exceptions
+    'user-unhandled', // Break on user-unhandled exceptions
   ],
 };

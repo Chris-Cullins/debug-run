@@ -4,9 +4,9 @@
  * Handles fetching and expanding variables from the debug adapter.
  */
 
-import type { IDapClient } from "../dap/client-interface.js";
-import type { Variable as DapVariable } from "../dap/protocol.js";
-import type { VariableValue, VariableChange } from "../output/events.js";
+import type { IDapClient } from '../dap/client-interface.js';
+import type { Variable as DapVariable } from '../dap/protocol.js';
+import type { VariableValue, VariableChange } from '../output/events.js';
 
 /**
  * Property names that provide no debugging value and waste tokens.
@@ -14,31 +14,31 @@ import type { VariableValue, VariableChange } from "../output/events.js";
  */
 const BLOCKED_PROPERTIES = new Set([
   // C# record EqualityContract and related reflection noise
-  "EqualityContract",
-  "CustomAttributes",
-  "DeclaredConstructors",
-  "DeclaredEvents",
-  "DeclaredFields",
-  "DeclaredMembers",
-  "DeclaredMethods",
-  "DeclaredNestedTypes",
-  "DeclaredProperties",
-  "DeclaringMethod",
-  "DeclaringType",
-  "GenericParameterAttributes",
-  "GenericParameterPosition",
-  "GenericTypeArguments",
-  "ImplementedInterfaces",
-  "MemberType",
-  "MetadataToken",
-  "ReflectedType",
-  "TypeHandle",
-  "UnderlyingSystemType",
+  'EqualityContract',
+  'CustomAttributes',
+  'DeclaredConstructors',
+  'DeclaredEvents',
+  'DeclaredFields',
+  'DeclaredMembers',
+  'DeclaredMethods',
+  'DeclaredNestedTypes',
+  'DeclaredProperties',
+  'DeclaringMethod',
+  'DeclaringType',
+  'GenericParameterAttributes',
+  'GenericParameterPosition',
+  'GenericTypeArguments',
+  'ImplementedInterfaces',
+  'MemberType',
+  'MetadataToken',
+  'ReflectedType',
+  'TypeHandle',
+  'UnderlyingSystemType',
   // Common noise
-  "[More]",
-  "Raw View",
-  "Static members",
-  "Non-Public members",
+  '[More]',
+  'Raw View',
+  'Static members',
+  'Non-Public members',
 ]);
 
 /**
@@ -91,7 +91,7 @@ export interface VariableInspectorOptions {
   maxCollectionItems?: number;
   /** Timeout for variable fetching in ms (default: 5000) */
   timeout?: number;
-  /** 
+  /**
    * Deduplicate repeated object instances by content hash (default: true)
    * When enabled, if the same object content is encountered multiple times,
    * subsequent occurrences show "[see: path.to.first.occurrence]" instead of full expansion.
@@ -141,20 +141,26 @@ export class VariableInspector {
 
       for (const scope of scopesResponse.scopes) {
         // Only get Locals and Arguments scopes
-        if (scope.name === "Locals" || scope.name === "Arguments" || scope.name === "Local") {
+        if (scope.name === 'Locals' || scope.name === 'Arguments' || scope.name === 'Local') {
           const vars = await this.client.variables({
             variablesReference: scope.variablesReference,
             count: this.options.maxCollectionItems,
           });
 
           for (const v of vars.variables) {
-            result[v.name] = await this.expandVariable(v, this.options.maxDepth, visited, contentHashes, v.name);
+            result[v.name] = await this.expandVariable(
+              v,
+              this.options.maxDepth,
+              visited,
+              contentHashes,
+              v.name
+            );
           }
         }
       }
     } catch (error) {
       // Return empty if we can't get variables
-      console.error("Failed to get locals:", error);
+      console.error('Failed to get locals:', error);
     }
 
     return result;
@@ -173,10 +179,10 @@ export class VariableInspector {
     depth: number = 2,
     visited: Set<number> = new Set(),
     contentHashes: Map<string, string> = new Map(),
-    currentPath: string = ""
+    currentPath: string = ''
   ): Promise<VariableValue> {
     const variable: VariableValue = {
-      type: v.type || "unknown",
+      type: v.type || 'unknown',
       value: this.parseValue(v.value, v.type),
       expandable: v.variablesReference > 0,
       variablesReference: v.variablesReference > 0 ? v.variablesReference : undefined,
@@ -202,7 +208,7 @@ export class VariableInspector {
     if (v.variablesReference > 0 && depth > 0) {
       // Check for circular reference
       if (visited.has(v.variablesReference)) {
-        variable.value = "[Circular Reference]";
+        variable.value = '[Circular Reference]';
         variable.circular = true;
         return variable;
       }
@@ -218,36 +224,46 @@ export class VariableInspector {
 
         // Filter out blocked properties
         let filteredChildren = children.variables.filter(
-          child => !this.isBlockedProperty(child.name)
+          (child) => !this.isBlockedProperty(child.name)
         );
 
         // Optionally filter out null properties
         if (this.options.omitNullProperties) {
-          filteredChildren = filteredChildren.filter(
-            child => !this.isNullValue(child.value)
-          );
+          filteredChildren = filteredChildren.filter((child) => !this.isNullValue(child.value));
         }
 
         // Check if this is a collection/array
         if (this.isCollection(v.type, filteredChildren)) {
           variable.value = {
-            type: v.type || "collection",
+            type: v.type || 'collection',
             count: this.getCollectionCount(v, filteredChildren.length),
-            items: await this.expandCollection(filteredChildren, depth - 1, visited, contentHashes, currentPath),
+            items: await this.expandCollection(
+              filteredChildren,
+              depth - 1,
+              visited,
+              contentHashes,
+              currentPath
+            ),
           };
         } else {
           // Regular object - check for content-based deduplication
           const obj: Record<string, VariableValue> = {};
           for (const child of filteredChildren) {
             const childPath = currentPath ? `${currentPath}.${child.name}` : child.name;
-            obj[child.name] = await this.expandVariable(child, depth - 1, visited, contentHashes, childPath);
+            obj[child.name] = await this.expandVariable(
+              child,
+              depth - 1,
+              visited,
+              contentHashes,
+              childPath
+            );
           }
-          
+
           // Content-based deduplication for objects
           if (this.options.deduplicateByContent && Object.keys(obj).length > 0) {
             const contentHash = this.computeContentHash(v.type, obj);
             const existingPath = contentHashes.get(contentHash);
-            
+
             if (existingPath) {
               // This content was seen before - reference the original
               variable.value = `[see: ${existingPath}]`;
@@ -256,11 +272,11 @@ export class VariableInspector {
               variable.deduplicated = true;
               return variable;
             }
-            
+
             // First occurrence - record it
             contentHashes.set(contentHash, currentPath);
           }
-          
+
           variable.value = obj;
         }
       } catch {
@@ -285,7 +301,7 @@ export class VariableInspector {
         const response = await this.client.evaluate({
           expression,
           frameId,
-          context: "watch",
+          context: 'watch',
         });
 
         results[expression] = {
@@ -294,7 +310,7 @@ export class VariableInspector {
         };
       } catch (error) {
         results[expression] = {
-          result: "",
+          result: '',
           error: error instanceof Error ? error.message : String(error),
         };
       }
@@ -315,7 +331,7 @@ export class VariableInspector {
    */
   private isBlockedType(type: string | undefined): boolean {
     if (!type) return false;
-    return BLOCKED_TYPE_PATTERNS.some(pattern => pattern.test(type));
+    return BLOCKED_TYPE_PATTERNS.some((pattern) => pattern.test(type));
   }
 
   /**
@@ -323,7 +339,7 @@ export class VariableInspector {
    */
   private isServiceType(type: string | undefined): boolean {
     if (!type) return false;
-    return SERVICE_TYPE_PATTERNS.some(pattern => pattern.test(type));
+    return SERVICE_TYPE_PATTERNS.some((pattern) => pattern.test(type));
   }
 
   /**
@@ -331,7 +347,7 @@ export class VariableInspector {
    */
   private isNullValue(value: string): boolean {
     const lower = value.toLowerCase();
-    return lower === "null" || lower === "none" || lower === "undefined" || lower === "nil";
+    return lower === 'null' || lower === 'none' || lower === 'undefined' || lower === 'nil';
   }
 
   /**
@@ -340,37 +356,37 @@ export class VariableInspector {
    */
   private computeContentHash(type: string | undefined, obj: Record<string, VariableValue>): string {
     // Simple hash: type + sorted property names + their types and primitive values
-    const parts: string[] = [type || ""];
+    const parts: string[] = [type || ''];
     const sortedKeys = Object.keys(obj).sort();
-    
+
     for (const key of sortedKeys) {
       const val = obj[key];
       parts.push(`${key}:${val.type}`);
       // Include primitive values in hash, but not nested objects (to avoid deep comparison)
-      if (typeof val.value !== "object" || val.value === null) {
+      if (typeof val.value !== 'object' || val.value === null) {
         parts.push(String(val.value));
       }
     }
-    
-    return parts.join("|");
+
+    return parts.join('|');
   }
 
   /**
    * Parse a value string into an appropriate JS type
    */
   private parseValue(value: string, type?: string): unknown {
-    if (value === "null" || value === "None") return null;
-    if (value === "undefined") return undefined;
-    if (value === "true" || value === "True") return true;
-    if (value === "false" || value === "False") return false;
+    if (value === 'null' || value === 'None') return null;
+    if (value === 'undefined') return undefined;
+    if (value === 'true' || value === 'True') return true;
+    if (value === 'false' || value === 'False') return false;
 
     // Try to parse numbers
-    if (type?.includes("int") || type?.includes("Int") || type === "number") {
+    if (type?.includes('int') || type?.includes('Int') || type === 'number') {
       const num = parseInt(value, 10);
       if (!isNaN(num)) return num;
     }
 
-    if (type?.includes("float") || type?.includes("double") || type?.includes("decimal")) {
+    if (type?.includes('float') || type?.includes('double') || type?.includes('decimal')) {
       const num = parseFloat(value);
       if (!isNaN(num)) return num;
     }
@@ -393,17 +409,17 @@ export class VariableInspector {
     if (!type) return false;
 
     const collectionTypes = [
-      "List",
-      "Array",
-      "Set",
-      "Dictionary",
-      "Map",
-      "Collection",
-      "[]",
-      "list",
-      "dict",
-      "set",
-      "tuple",
+      'List',
+      'Array',
+      'Set',
+      'Dictionary',
+      'Map',
+      'Collection',
+      '[]',
+      'list',
+      'dict',
+      'set',
+      'tuple',
     ];
 
     return collectionTypes.some((t) => type.includes(t));
@@ -473,7 +489,7 @@ export class VariableInspector {
         changes.push({
           name,
           changeType: 'modified',
-          newValue: curr[name]
+          newValue: curr[name],
         });
       }
     }

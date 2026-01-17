@@ -5,9 +5,9 @@
  * and extracting the testhost PID for debugger attachment.
  */
 
-import { spawn, ChildProcess } from "node:child_process";
-import * as path from "node:path";
-import * as readline from "node:readline";
+import { spawn, ChildProcess } from 'node:child_process';
+import * as path from 'node:path';
+import * as readline from 'node:readline';
 
 export interface TestRunnerConfig {
   /** Path to the test project directory or .csproj file */
@@ -44,32 +44,31 @@ export async function launchTestRunner(config: TestRunnerConfig): Promise<TestRu
 
   // Determine working directory
   const projectPath = path.resolve(testProject);
-  const workingDir = cwd ?? (projectPath.endsWith(".csproj")
-    ? path.dirname(projectPath)
-    : projectPath);
+  const workingDir =
+    cwd ?? (projectPath.endsWith('.csproj') ? path.dirname(projectPath) : projectPath);
 
   // Build arguments
-  const args = ["test", "--no-build"];
+  const args = ['test', '--no-build'];
 
   // Add filter if specified
   if (filter) {
-    args.push("--filter", filter);
+    args.push('--filter', filter);
   }
 
   // Add any additional arguments
   args.push(...additionalArgs);
 
   onProgress?.(`Starting test runner in: ${workingDir}`);
-  onProgress?.(`Command: dotnet ${args.join(" ")}`);
+  onProgress?.(`Command: dotnet ${args.join(' ')}`);
 
   // Spawn dotnet test with VSTEST_HOST_DEBUG=1
-  const testProcess = spawn("dotnet", args, {
+  const testProcess = spawn('dotnet', args, {
     cwd: workingDir,
     env: {
       ...process.env,
-      VSTEST_HOST_DEBUG: "1",
+      VSTEST_HOST_DEBUG: '1',
     },
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
 
   // Create readline interfaces for stdout and stderr
@@ -88,7 +87,7 @@ export async function launchTestRunner(config: TestRunnerConfig): Promise<TestRu
     // On Windows, the name is typically "testhost", on macOS/Linux it may be "dotnet"
     const pidPattern = /Process Id:\s*(\d+),?\s*Name:\s*(testhost|dotnet)/i;
 
-    const handleLine = (line: string, stream: "stdout" | "stderr") => {
+    const handleLine = (line: string, stream: 'stdout' | 'stderr') => {
       onProgress?.(`[${stream}] ${line}`);
 
       // Check for debug hint
@@ -108,22 +107,24 @@ export async function launchTestRunner(config: TestRunnerConfig): Promise<TestRu
       }
     };
 
-    stdoutReader.on("line", (line) => handleLine(line, "stdout"));
-    stderrReader.on("line", (line) => handleLine(line, "stderr"));
+    stdoutReader.on('line', (line) => handleLine(line, 'stdout'));
+    stderrReader.on('line', (line) => handleLine(line, 'stderr'));
 
     // Handle process exit before we find the PID
-    testProcess.on("exit", (code, signal) => {
+    testProcess.on('exit', (code, signal) => {
       if (!foundPid) {
         exitedEarly = true;
-        reject(new Error(
-          `Test process exited before testhost started. ` +
-          `Exit code: ${code}, signal: ${signal}. ` +
-          `Make sure the test project builds successfully and has tests.`
-        ));
+        reject(
+          new Error(
+            `Test process exited before testhost started. ` +
+              `Exit code: ${code}, signal: ${signal}. ` +
+              `Make sure the test project builds successfully and has tests.`
+          )
+        );
       }
     });
 
-    testProcess.on("error", (err) => {
+    testProcess.on('error', (err) => {
       if (!foundPid) {
         reject(new Error(`Failed to start test process: ${err.message}`));
       }
@@ -133,10 +134,12 @@ export async function launchTestRunner(config: TestRunnerConfig): Promise<TestRu
     setTimeout(() => {
       if (!foundPid && !exitedEarly) {
         testProcess.kill();
-        reject(new Error(
-          "Timeout waiting for testhost to start. " +
-          "The VSTEST_HOST_DEBUG output was not detected within 60 seconds."
-        ));
+        reject(
+          new Error(
+            'Timeout waiting for testhost to start. ' +
+              'The VSTEST_HOST_DEBUG output was not detected within 60 seconds.'
+          )
+        );
       }
     }, 60000);
   });
@@ -149,7 +152,7 @@ export async function launchTestRunner(config: TestRunnerConfig): Promise<TestRu
 export function cleanupTestRunner(testProcess: ChildProcess): void {
   try {
     if (!testProcess.killed) {
-      testProcess.kill("SIGTERM");
+      testProcess.kill('SIGTERM');
     }
   } catch {
     // Process may already be dead

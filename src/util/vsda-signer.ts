@@ -5,10 +5,10 @@
  * This is required for vsdbg authentication.
  */
 
-import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
-import * as path from "node:path";
-import * as os from "node:os";
+import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import * as path from 'node:path';
+import * as os from 'node:os';
 
 // Create a require function for loading native modules in ESM context
 const require = createRequire(import.meta.url);
@@ -16,14 +16,35 @@ const require = createRequire(import.meta.url);
 // Possible locations of VS Code's VSDA native module (.node file)
 const VSDA_PATHS = [
   // macOS
-  "/Applications/Visual Studio Code.app/Contents/Resources/app/node_modules.asar.unpacked/vsda/build/Release/vsda.node",
-  "/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/node_modules.asar.unpacked/vsda/build/Release/vsda.node",
+  '/Applications/Visual Studio Code.app/Contents/Resources/app/node_modules.asar.unpacked/vsda/build/Release/vsda.node',
+  '/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/node_modules.asar.unpacked/vsda/build/Release/vsda.node',
   // Linux
-  "/usr/share/code/resources/app/node_modules.asar.unpacked/vsda/build/Release/vsda.node",
-  "/usr/share/code-insiders/resources/app/node_modules.asar.unpacked/vsda/build/Release/vsda.node",
+  '/usr/share/code/resources/app/node_modules.asar.unpacked/vsda/build/Release/vsda.node',
+  '/usr/share/code-insiders/resources/app/node_modules.asar.unpacked/vsda/build/Release/vsda.node',
   // Windows (common install locations)
-  path.join(process.env.LOCALAPPDATA || "", "Programs", "Microsoft VS Code", "resources", "app", "node_modules.asar.unpacked", "vsda", "build", "Release", "vsda.node"),
-  path.join(process.env.PROGRAMFILES || "", "Microsoft VS Code", "resources", "app", "node_modules.asar.unpacked", "vsda", "build", "Release", "vsda.node"),
+  path.join(
+    process.env.LOCALAPPDATA || '',
+    'Programs',
+    'Microsoft VS Code',
+    'resources',
+    'app',
+    'node_modules.asar.unpacked',
+    'vsda',
+    'build',
+    'Release',
+    'vsda.node'
+  ),
+  path.join(
+    process.env.PROGRAMFILES || '',
+    'Microsoft VS Code',
+    'resources',
+    'app',
+    'node_modules.asar.unpacked',
+    'vsda',
+    'build',
+    'Release',
+    'vsda.node'
+  ),
 ];
 
 interface VsdaModule {
@@ -48,9 +69,19 @@ export function loadVsda(): VsdaModule | null {
   const home = os.homedir();
   const additionalPaths = [
     // Cursor (VS Code fork) on macOS
-    "/Applications/Cursor.app/Contents/Resources/app/node_modules.asar.unpacked/vsda/build/Release/vsda.node",
+    '/Applications/Cursor.app/Contents/Resources/app/node_modules.asar.unpacked/vsda/build/Release/vsda.node',
     // User-installed VS Code on Linux
-    path.join(home, ".vscode-server", "bin", "*", "node_modules.asar.unpacked", "vsda", "build", "Release", "vsda.node"),
+    path.join(
+      home,
+      '.vscode-server',
+      'bin',
+      '*',
+      'node_modules.asar.unpacked',
+      'vsda',
+      'build',
+      'Release',
+      'vsda.node'
+    ),
   ];
 
   const allPaths = [...VSDA_PATHS, ...additionalPaths];

@@ -4,7 +4,7 @@
  * Defines the contract for debug adapter configurations.
  */
 
-import type { LaunchRequestArguments, AttachRequestArguments } from "../dap/protocol.js";
+import type { LaunchRequestArguments, AttachRequestArguments } from '../dap/protocol.js';
 
 export interface LaunchOptions {
   program: string;
@@ -21,7 +21,7 @@ export interface AttachOptions {
   port?: number;
 }
 
-export type TransportType = "stdio" | "socket";
+export type TransportType = 'stdio' | 'socket';
 
 export interface AdapterConfig {
   /** DAP adapter ID (e.g., "coreclr", "python") */
@@ -69,14 +69,14 @@ export interface AdapterConfig {
  * Check if a command exists in PATH
  */
 export async function commandExists(command: string): Promise<string | null> {
-  const { exec } = await import("node:child_process");
-  const { promisify } = await import("node:util");
+  const { exec } = await import('node:child_process');
+  const { promisify } = await import('node:util');
   const execAsync = promisify(exec);
 
   try {
-    const cmd = process.platform === "win32" ? `where ${command}` : `which ${command}`;
+    const cmd = process.platform === 'win32' ? `where ${command}` : `which ${command}`;
     const { stdout } = await execAsync(cmd);
-    return stdout.trim().split("\n")[0] || null;
+    return stdout.trim().split('\n')[0] || null;
   } catch {
     return null;
   }

@@ -4,10 +4,10 @@
  * Handles parsing, setting, and tracking breakpoints.
  */
 
-import * as path from "node:path";
-import type { IDapClient } from "../dap/client-interface.js";
-import type { SourceBreakpoint } from "../dap/protocol.js";
-import type { OutputFormatter } from "../output/formatter.js";
+import * as path from 'node:path';
+import type { IDapClient } from '../dap/client-interface.js';
+import type { SourceBreakpoint } from '../dap/protocol.js';
+import type { OutputFormatter } from '../output/formatter.js';
 
 export interface BreakpointSpec {
   file: string;
@@ -68,9 +68,7 @@ export function parseLogpointSpec(spec: string): BreakpointSpec {
   const match = spec.match(/^(.+):(\d+)\|(.+)$/);
 
   if (!match) {
-    throw new Error(
-      `Invalid logpoint format: "${spec}". Expected "file:line|log message"`
-    );
+    throw new Error(`Invalid logpoint format: "${spec}". Expected "file:line|log message"`);
   }
 
   const [, file, lineStr, logMessage] = match;
@@ -140,10 +138,7 @@ export class BreakpointManager {
   /**
    * Set breakpoints for a single file
    */
-  private async setFileBreakpoints(
-    file: string,
-    specs: TrackedBreakpoint[]
-  ): Promise<void> {
+  private async setFileBreakpoints(file: string, specs: TrackedBreakpoint[]): Promise<void> {
     const sourceBreakpoints: SourceBreakpoint[] = specs.map((spec) => ({
       line: spec.line,
       condition: spec.condition,
@@ -182,16 +177,9 @@ export class BreakpointManager {
       for (const spec of specs) {
         spec.id = this.nextId++;
         spec.verified = false;
-        spec.message = error instanceof Error ? error.message : "Failed to set breakpoint";
+        spec.message = error instanceof Error ? error.message : 'Failed to set breakpoint';
 
-        this.formatter.breakpointSet(
-          spec.id,
-          file,
-          spec.line,
-          false,
-          spec.condition,
-          spec.message
-        );
+        this.formatter.breakpointSet(spec.id, file, spec.line, false, spec.condition, spec.message);
       }
     }
   }

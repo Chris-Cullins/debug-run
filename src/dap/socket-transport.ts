@@ -4,12 +4,12 @@
  * Handles DAP communication over TCP sockets (used by js-debug and others).
  */
 
-import { Socket, connect } from "node:net";
-import { EventEmitter } from "node:events";
-import type { ProtocolMessage, Request, Response, Event } from "./protocol.js";
+import { Socket, connect } from 'node:net';
+import { EventEmitter } from 'node:events';
+import type { ProtocolMessage, Request, Response, Event } from './protocol.js';
 
-const HEADER_DELIMITER = "\r\n\r\n";
-const CONTENT_LENGTH_HEADER = "Content-Length: ";
+const HEADER_DELIMITER = '\r\n\r\n';
+const CONTENT_LENGTH_HEADER = 'Content-Length: ';
 
 interface PendingRequest {
   resolve: (response: Response) => void;
@@ -50,36 +50,36 @@ export class SocketDapTransport extends EventEmitter {
       });
 
       const onError = (err: Error) => {
-        this.socket?.removeListener("connect", onConnect);
+        this.socket?.removeListener('connect', onConnect);
         reject(err);
       };
 
       const onConnect = () => {
-        this.socket?.removeListener("error", onError);
+        this.socket?.removeListener('error', onError);
         this.setupSocket();
         resolve();
       };
 
-      this.socket.once("error", onError);
-      this.socket.once("connect", onConnect);
+      this.socket.once('error', onError);
+      this.socket.once('connect', onConnect);
     });
   }
 
   private setupSocket(): void {
     if (!this.socket) return;
 
-    this.socket.on("data", (chunk: Buffer) => this.onData(chunk));
+    this.socket.on('data', (chunk: Buffer) => this.onData(chunk));
 
-    this.socket.on("close", () => {
+    this.socket.on('close', () => {
       this.closed = true;
-      this.rejectAllPending(new Error("Socket closed"));
-      this.emit("exit", 0, null);
+      this.rejectAllPending(new Error('Socket closed'));
+      this.emit('exit', 0, null);
     });
 
-    this.socket.on("error", (error) => {
+    this.socket.on('error', (error) => {
       this.closed = true;
       this.rejectAllPending(error);
-      this.emit("error", error);
+      this.emit('error', error);
     });
   }
 
@@ -88,13 +88,13 @@ export class SocketDapTransport extends EventEmitter {
    */
   async sendRequest<T>(command: string, args?: unknown): Promise<T> {
     if (this.closed || !this.socket) {
-      throw new Error("Transport is closed");
+      throw new Error('Transport is closed');
     }
 
     const seq = this.seq++;
     const request: Request = {
       seq,
-      type: "request",
+      type: 'request',
       command,
       arguments: args,
     };
@@ -102,9 +102,7 @@ export class SocketDapTransport extends EventEmitter {
     return new Promise<T>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pendingRequests.delete(seq);
-        reject(
-          new Error(`Request '${command}' timed out after ${this.requestTimeout}ms`)
-        );
+        reject(new Error(`Request '${command}' timed out after ${this.requestTimeout}ms`));
       }, this.requestTimeout);
 
       this.pendingRequests.set(seq, {
@@ -134,7 +132,7 @@ export class SocketDapTransport extends EventEmitter {
   close(): void {
     if (this.closed) return;
     this.closed = true;
-    this.rejectAllPending(new Error("Transport closed"));
+    this.rejectAllPending(new Error('Transport closed'));
     this.socket?.destroy();
     this.socket = null;
   }
@@ -149,10 +147,16 @@ export class SocketDapTransport extends EventEmitter {
   /**
    * Send a response to a reverse request from the debug adapter
    */
-  sendResponse(requestSeq: number, command: string, success: boolean = true, body?: unknown, message?: string): void {
+  sendResponse(
+    requestSeq: number,
+    command: string,
+    success: boolean = true,
+    body?: unknown,
+    message?: string
+  ): void {
     const response: Response = {
       seq: this.seq++,
-      type: "response",
+      type: 'response',
       request_seq: requestSeq,
       command,
       success,
@@ -172,18 +176,19 @@ export class SocketDapTransport extends EventEmitter {
 
     // Debug logging
     if (process.env.DEBUG_DAP) {
-      const summary = message.type === "request"
-        ? `request:${(message as Request).command}`
-        : `response:${(message as Response).command}`;
+      const summary =
+        message.type === 'request'
+          ? `request:${(message as Request).command}`
+          : `response:${(message as Response).command}`;
       console.error(`[DAP send] ${summary}`);
     }
 
     const json = JSON.stringify(message);
-    const contentLength = Buffer.byteLength(json, "utf-8");
+    const contentLength = Buffer.byteLength(json, 'utf-8');
     const header = `${CONTENT_LENGTH_HEADER}${contentLength}${HEADER_DELIMITER}`;
 
     this.socket.write(header + json);
-    this.emit("sent", message);
+    this.emit('sent', message);
   }
 
   private onData(chunk: Buffer): void {
@@ -203,7 +208,7 @@ export class SocketDapTransport extends EventEmitter {
     const headerEnd = this.buffer.indexOf(HEADER_DELIMITER);
     if (headerEnd === -1) return null;
 
-    const headerStr = this.buffer.subarray(0, headerEnd).toString("utf-8");
+    const headerStr = this.buffer.subarray(0, headerEnd).toString('utf-8');
     const match = headerStr.match(/Content-Length:\s*(\d+)/i);
     if (!match) {
       this.buffer = this.buffer.subarray(headerEnd + HEADER_DELIMITER.length);
@@ -216,13 +221,13 @@ export class SocketDapTransport extends EventEmitter {
 
     if (this.buffer.length < bodyEnd) return null;
 
-    const bodyStr = this.buffer.subarray(bodyStart, bodyEnd).toString("utf-8");
+    const bodyStr = this.buffer.subarray(bodyStart, bodyEnd).toString('utf-8');
     this.buffer = this.buffer.subarray(bodyEnd);
 
     try {
       return JSON.parse(bodyStr) as ProtocolMessage;
     } catch {
-      this.emit("parseError", bodyStr);
+      this.emit('parseError', bodyStr);
       return null;
     }
   }
@@ -230,29 +235,33 @@ export class SocketDapTransport extends EventEmitter {
   private handleMessage(message: ProtocolMessage): void {
     // Debug logging
     if (process.env.DEBUG_DAP) {
-      const summary = message.type === "event"
-        ? `event:${(message as Event).event}`
-        : message.type === "response"
-          ? `response:${(message as Response).command}:${(message as Response).success}`
-          : `request:${(message as Request).command}`;
+      const summary =
+        message.type === 'event'
+          ? `event:${(message as Event).event}`
+          : message.type === 'response'
+            ? `response:${(message as Response).command}:${(message as Response).success}`
+            : `request:${(message as Request).command}`;
       console.error(`[DAP recv] ${summary}`);
     }
 
-    this.emit("message", message);
+    this.emit('message', message);
 
     switch (message.type) {
-      case "response":
+      case 'response':
         this.handleResponse(message as Response);
         break;
-      case "event":
+      case 'event':
         this.handleEvent(message as Event);
         break;
-      case "request":
+      case 'request':
         // Log reverse requests in detail for debugging
         if (process.env.DEBUG_DAP) {
-          console.error(`[DAP reverse request] ${(message as Request).command}:`, JSON.stringify((message as Request).arguments, null, 2));
+          console.error(
+            `[DAP reverse request] ${(message as Request).command}:`,
+            JSON.stringify((message as Request).arguments, null, 2)
+          );
         }
-        this.emit("reverseRequest", message as Request);
+        this.emit('reverseRequest', message as Request);
         this.emit(`reverseRequest:${(message as Request).command}`, message as Request);
         break;
     }
@@ -264,11 +273,11 @@ export class SocketDapTransport extends EventEmitter {
       this.pendingRequests.delete(response.request_seq);
       pending.resolve(response);
     }
-    this.emit("response", response);
+    this.emit('response', response);
   }
 
   private handleEvent(event: Event): void {
-    this.emit("event", event);
+    this.emit('event', event);
     this.emit(`event:${event.event}`, event.body);
   }
 

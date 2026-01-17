@@ -51,7 +51,7 @@ interface BaseEvent {
 
 // Session lifecycle events
 export interface SessionStartEvent extends BaseEvent {
-  type: "session_start";
+  type: 'session_start';
   adapter: string;
   /** Program path (launch mode) */
   program?: string;
@@ -64,7 +64,7 @@ export interface SessionStartEvent extends BaseEvent {
 }
 
 export interface SessionEndEvent extends BaseEvent {
-  type: "session_end";
+  type: 'session_end';
   summary: {
     durationMs: number;
     exitCode: number | null;
@@ -76,24 +76,24 @@ export interface SessionEndEvent extends BaseEvent {
 
 // Process events
 export interface ProcessLaunchedEvent extends BaseEvent {
-  type: "process_launched";
+  type: 'process_launched';
   pid?: number;
 }
 
 export interface ProcessAttachedEvent extends BaseEvent {
-  type: "process_attached";
+  type: 'process_attached';
   pid: number;
 }
 
 export interface ProcessExitedEvent extends BaseEvent {
-  type: "process_exited";
+  type: 'process_exited';
   exitCode: number;
   durationMs: number;
 }
 
 // Breakpoint events
 export interface BreakpointSetEvent extends BaseEvent {
-  type: "breakpoint_set";
+  type: 'breakpoint_set';
   id: number;
   file: string;
   line: number;
@@ -103,7 +103,7 @@ export interface BreakpointSetEvent extends BaseEvent {
 }
 
 export interface BreakpointHitEvent extends BaseEvent {
-  type: "breakpoint_hit";
+  type: 'breakpoint_hit';
   id?: number;
   threadId: number;
   location: SourceLocation;
@@ -116,16 +116,16 @@ export interface BreakpointHitEvent extends BaseEvent {
 
 /** Category of exception for quick classification */
 export type ExceptionCategory =
-  | "network"
-  | "database"
-  | "authentication"
-  | "validation"
-  | "timeout"
-  | "file_system"
-  | "configuration"
-  | "null_reference"
-  | "argument"
-  | "unknown";
+  | 'network'
+  | 'database'
+  | 'authentication'
+  | 'validation'
+  | 'timeout'
+  | 'file_system'
+  | 'configuration'
+  | 'null_reference'
+  | 'argument'
+  | 'unknown';
 
 /** A single entry in the flattened exception chain */
 export interface ExceptionChainEntry {
@@ -158,7 +158,7 @@ export interface RootCauseInfo {
 }
 
 export interface ExceptionThrownEvent extends BaseEvent {
-  type: "exception_thrown";
+  type: 'exception_thrown';
   threadId: number;
   exception: {
     type: string;
@@ -175,13 +175,13 @@ export interface ExceptionThrownEvent extends BaseEvent {
 }
 
 export interface ExceptionBreakpointSetEvent extends BaseEvent {
-  type: "exception_breakpoint_set";
+  type: 'exception_breakpoint_set';
   filters: string[];
 }
 
 // Logpoint events
 export interface LogpointHitEvent extends BaseEvent {
-  type: "logpoint_hit";
+  type: 'logpoint_hit';
   id?: number;
   threadId: number;
   location: SourceLocation;
@@ -190,7 +190,7 @@ export interface LogpointHitEvent extends BaseEvent {
 
 // Stepping events
 export interface StepCompletedEvent extends BaseEvent {
-  type: "step_completed";
+  type: 'step_completed';
   threadId: number;
   location: SourceLocation;
   stackTrace: StackFrameInfo[];
@@ -199,15 +199,15 @@ export interface StepCompletedEvent extends BaseEvent {
 
 // Trace mode events
 export type TraceStopReason =
-  | "function_return"
-  | "exception"
-  | "breakpoint"
-  | "limit_reached"
-  | "expression_true"
-  | "end_of_program";
+  | 'function_return'
+  | 'exception'
+  | 'breakpoint'
+  | 'limit_reached'
+  | 'expression_true'
+  | 'end_of_program';
 
 export interface TraceStartedEvent extends BaseEvent {
-  type: "trace_started";
+  type: 'trace_started';
   threadId: number;
   startLocation: SourceLocation;
   initialStackDepth: number;
@@ -219,7 +219,7 @@ export interface TraceStartedEvent extends BaseEvent {
 }
 
 export interface TraceStepEvent extends BaseEvent {
-  type: "trace_step";
+  type: 'trace_step';
   threadId: number;
   stepNumber: number;
   location: SourceLocation;
@@ -229,7 +229,7 @@ export interface TraceStepEvent extends BaseEvent {
 }
 
 export interface TraceCompletedEvent extends BaseEvent {
-  type: "trace_completed";
+  type: 'trace_completed';
   threadId: number;
   stopReason: TraceStopReason;
   stepsExecuted: number;
@@ -242,21 +242,21 @@ export interface TraceCompletedEvent extends BaseEvent {
 
 // Output from the debuggee
 export interface ProgramOutputEvent extends BaseEvent {
-  type: "program_output";
-  category: "stdout" | "stderr" | "console";
+  type: 'program_output';
+  category: 'stdout' | 'stderr' | 'console';
   output: string;
 }
 
 // Error events
 export interface ErrorEvent extends BaseEvent {
-  type: "error";
+  type: 'error';
   message: string;
   details?: string;
 }
 
 // Assertion events
 export interface AssertionFailedEvent extends BaseEvent {
-  type: "assertion_failed";
+  type: 'assertion_failed';
   threadId: number;
   assertion: string;
   actualValue: string;

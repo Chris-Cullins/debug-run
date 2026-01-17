@@ -1,0 +1,55 @@
+# Source code (dist/ is the published artifact)
+src/
+scripts/
+tsconfig.json
+
+# Samples and tests
+samples/
+tests/
+**/*.test.ts
+vitest.config.ts
+
+# Development files
+.git/
+.github/
+.husky/
+.vscode/
+.idea/
+.claude/
+
+# Config files
+.eslintrc*
+.prettierrc*
+.editorconfig
+CLAUDE.md
+
+# Documentation (keep only README.md)
+docs/
+adapters/
+*.md
+!README.md
+
+# Planning/internal docs
+FUTURE_IDEAS.md
+debug-run-implementation-plan.md
+
+# Bundled adapters (users install these separately)
+bin/
+
+# Build artifacts and caches
+node_modules/
+*.tsbuildinfo
+.turbo/
+coverage/
+
+# Environment and secrets
+.env*
+*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

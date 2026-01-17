@@ -8,17 +8,12 @@
  * - Event dispatching
  */
 
-import type { ChildProcess } from "node:child_process";
-import { EventEmitter } from "node:events";
-import type {
-  ProtocolMessage,
-  Request,
-  Response,
-  Event,
-} from "./protocol.js";
+import type { ChildProcess } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import type { ProtocolMessage, Request, Response, Event } from './protocol.js';
 
-const HEADER_DELIMITER = "\r\n\r\n";
-const CONTENT_LENGTH_HEADER = "Content-Length: ";
+const HEADER_DELIMITER = '\r\n\r\n';
+const CONTENT_LENGTH_HEADER = 'Content-Length: ';
 
 interface PendingRequest {
   resolve: (response: Response) => void;
@@ -41,26 +36,24 @@ export class DapTransport extends EventEmitter {
     this.requestTimeout = requestTimeout;
 
     if (!process.stdout || !process.stdin) {
-      throw new Error("Process must have stdout and stdin");
+      throw new Error('Process must have stdout and stdin');
     }
 
-    process.stdout.on("data", (chunk: Buffer) => this.onData(chunk));
-    process.stderr?.on("data", (chunk: Buffer) => {
-      this.emit("stderr", chunk.toString());
+    process.stdout.on('data', (chunk: Buffer) => this.onData(chunk));
+    process.stderr?.on('data', (chunk: Buffer) => {
+      this.emit('stderr', chunk.toString());
     });
 
-    process.on("exit", (code, signal) => {
+    process.on('exit', (code, signal) => {
       this.closed = true;
-      this.rejectAllPending(
-        new Error(`Debug adapter exited with code ${code}, signal ${signal}`)
-      );
-      this.emit("exit", code, signal);
+      this.rejectAllPending(new Error(`Debug adapter exited with code ${code}, signal ${signal}`));
+      this.emit('exit', code, signal);
     });
 
-    process.on("error", (error) => {
+    process.on('error', (error) => {
       this.closed = true;
       this.rejectAllPending(error);
-      this.emit("error", error);
+      this.emit('error', error);
     });
   }
 
@@ -69,13 +62,13 @@ export class DapTransport extends EventEmitter {
    */
   async sendRequest<T>(command: string, args?: unknown): Promise<T> {
     if (this.closed) {
-      throw new Error("Transport is closed");
+      throw new Error('Transport is closed');
     }
 
     const seq = this.seq++;
     const request: Request = {
       seq,
-      type: "request",
+      type: 'request',
       command,
       arguments: args,
     };
@@ -113,7 +106,7 @@ export class DapTransport extends EventEmitter {
   close(): void {
     if (this.closed) return;
     this.closed = true;
-    this.rejectAllPending(new Error("Transport closed"));
+    this.rejectAllPending(new Error('Transport closed'));
     this.process.kill();
   }
 
@@ -133,7 +126,7 @@ export class DapTransport extends EventEmitter {
     }
 
     const json = JSON.stringify(message);
-    const contentLength = Buffer.byteLength(json, "utf-8");
+    const contentLength = Buffer.byteLength(json, 'utf-8');
     const header = `${CONTENT_LENGTH_HEADER}${contentLength}${HEADER_DELIMITER}`;
 
     if (process.env.DEBUG_DAP) {
@@ -141,7 +134,7 @@ export class DapTransport extends EventEmitter {
     }
 
     this.process.stdin.write(header + json);
-    this.emit("sent", message);
+    this.emit('sent', message);
   }
 
   private onData(chunk: Buffer): void {
@@ -163,7 +156,7 @@ export class DapTransport extends EventEmitter {
     if (headerEnd === -1) return null;
 
     // Parse Content-Length header
-    const headerStr = this.buffer.subarray(0, headerEnd).toString("utf-8");
+    const headerStr = this.buffer.subarray(0, headerEnd).toString('utf-8');
     const match = headerStr.match(/Content-Length:\s*(\d+)/i);
     if (!match) {
       // Invalid header, skip to next potential header
@@ -179,13 +172,13 @@ export class DapTransport extends EventEmitter {
     if (this.buffer.length < bodyEnd) return null;
 
     // Extract and parse JSON body
-    const bodyStr = this.buffer.subarray(bodyStart, bodyEnd).toString("utf-8");
+    const bodyStr = this.buffer.subarray(bodyStart, bodyEnd).toString('utf-8');
     this.buffer = this.buffer.subarray(bodyEnd);
 
     try {
       return JSON.parse(bodyStr) as ProtocolMessage;
     } catch {
-      this.emit("parseError", bodyStr);
+      this.emit('parseError', bodyStr);
       return null;
     }
   }
@@ -194,18 +187,18 @@ export class DapTransport extends EventEmitter {
     if (process.env.DEBUG_DAP) {
       console.error(`[DAP RX] ${JSON.stringify(message)}`);
     }
-    this.emit("message", message);
+    this.emit('message', message);
 
     switch (message.type) {
-      case "response":
+      case 'response':
         this.handleResponse(message as Response);
         break;
-      case "event":
+      case 'event':
         this.handleEvent(message as Event);
         break;
-      case "request":
+      case 'request':
         // Reverse requests from adapter (e.g., runInTerminal, handshake)
-        this.emit("reverseRequest", message as Request);
+        this.emit('reverseRequest', message as Request);
         this.emit(`reverseRequest:${(message as Request).command}`, message as Request);
         break;
     }
@@ -217,11 +210,11 @@ export class DapTransport extends EventEmitter {
       this.pendingRequests.delete(response.request_seq);
       pending.resolve(response);
     }
-    this.emit("response", response);
+    this.emit('response', response);
   }
 
   private handleEvent(event: Event): void {
-    this.emit("event", event);
+    this.emit('event', event);
     this.emit(`event:${event.event}`, event.body);
   }
 

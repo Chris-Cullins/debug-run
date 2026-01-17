@@ -10,12 +10,12 @@
  * - Manages session cleanup
  */
 
-import type { AdapterConfig } from "../adapters/base.js";
-import { DapClient } from "../dap/client.js";
-import { SocketDapClient } from "../dap/socket-client.js";
-import type { IDapClient } from "../dap/client-interface.js";
-import type { StoppedEventBody, ExitedEventBody, OutputEventBody } from "../dap/protocol.js";
-import { OutputFormatter } from "../output/formatter.js";
+import type { AdapterConfig } from '../adapters/base.js';
+import { DapClient } from '../dap/client.js';
+import { SocketDapClient } from '../dap/socket-client.js';
+import type { IDapClient } from '../dap/client-interface.js';
+import type { StoppedEventBody, ExitedEventBody, OutputEventBody } from '../dap/protocol.js';
+import { OutputFormatter } from '../output/formatter.js';
 import type {
   SourceLocation,
   StackFrameInfo,
@@ -28,10 +28,10 @@ import type {
   TraceCompletedEvent,
   TraceStopReason,
   AssertionFailedEvent,
-} from "../output/events.js";
-import { BreakpointManager } from "./breakpoints.js";
-import { VariableInspector } from "./variables.js";
-import { flattenExceptionChainFromLocals } from "./exceptions.js";
+} from '../output/events.js';
+import { BreakpointManager } from './breakpoints.js';
+import { VariableInspector } from './variables.js';
+import { flattenExceptionChainFromLocals } from './exceptions.js';
 
 export interface SessionConfig {
   adapter: AdapterConfig;
@@ -79,13 +79,13 @@ export interface SessionConfig {
 }
 
 type SessionState =
-  | "created"
-  | "connecting"
-  | "initializing"
-  | "configuring"
-  | "running"
-  | "stopped"
-  | "terminated";
+  | 'created'
+  | 'connecting'
+  | 'initializing'
+  | 'configuring'
+  | 'running'
+  | 'stopped'
+  | 'terminated';
 
 export class DebugSession {
   private config: SessionConfig;
@@ -94,7 +94,7 @@ export class DebugSession {
   private breakpointManager: BreakpointManager | null = null;
   private variableInspector: VariableInspector | null = null;
 
-  private state: SessionState = "created";
+  private state: SessionState = 'created';
   private startTime: number = 0;
   private exitCode: number | null = null;
   private breakpointsHit: number = 0;
@@ -135,10 +135,7 @@ export class DebugSession {
 
     // Emit session start
     if (this.config.attach && this.config.pid) {
-      this.formatter.sessionStartAttach(
-        this.config.adapter.name,
-        this.config.pid
-      );
+      this.formatter.sessionStartAttach(this.config.adapter.name, this.config.pid);
     } else {
       this.formatter.sessionStart(
         this.config.adapter.name,
@@ -166,7 +163,7 @@ export class DebugSession {
       await this.sessionPromise;
     } catch (error) {
       this.formatter.error(
-        "Session failed",
+        'Session failed',
         error instanceof Error ? error.message : String(error)
       );
       throw error;
@@ -177,9 +174,9 @@ export class DebugSession {
 
   private async start(): Promise<void> {
     // Create and connect DAP client
-    this.state = "connecting";
+    this.state = 'connecting';
 
-    if (this.config.adapter.transport === "socket" && this.config.adapter.socketPort) {
+    if (this.config.adapter.transport === 'socket' && this.config.adapter.socketPort) {
       // Use socket-based client for adapters like js-debug
       this.client = new SocketDapClient({
         command: this.config.adapter.command,
@@ -204,7 +201,7 @@ export class DebugSession {
     await this.client.connect();
 
     // Initialize DAP session
-    this.state = "initializing";
+    this.state = 'initializing';
     await this.client.initialize({
       adapterID: this.config.adapter.id,
     });
@@ -231,10 +228,10 @@ export class DebugSession {
 
     // Some adapters (like debugpy) require launch before breakpoints can be set
     const requiresLaunchFirst = this.config.adapter.requiresLaunchFirst === true;
-    
+
     if (!requiresLaunchFirst) {
       // Standard DAP flow: set breakpoints before launch
-      this.state = "configuring";
+      this.state = 'configuring';
       await this.breakpointManager.setAllBreakpoints();
       await this.setExceptionBreakpoints();
     }
@@ -251,7 +248,7 @@ export class DebugSession {
       if (requiresLaunchFirst) {
         // Wait for 'initialized' event after attach, then set breakpoints
         await this.waitForInitialized();
-        this.state = "configuring";
+        this.state = 'configuring';
         await this.breakpointManager.setAllBreakpoints();
         await this.setExceptionBreakpoints();
       }
@@ -259,9 +256,9 @@ export class DebugSession {
       // Signal configuration done
       await this.client.configurationDone();
 
-      this.state = "running";
+      this.state = 'running';
       this.formatter.emit(
-        this.formatter.createEvent("process_attached", {
+        this.formatter.createEvent('process_attached', {
           pid: this.config.pid,
         })
       );
@@ -275,15 +272,15 @@ export class DebugSession {
       });
 
       if (process.env.DEBUG_DAP) {
-        console.error("[Launch config]", JSON.stringify(launchConfig, null, 2));
+        console.error('[Launch config]', JSON.stringify(launchConfig, null, 2));
       }
 
       // Adapter-specific order varies:
       // - js-debug (socket): configurationDone before launch
       // - vsdbg (stdio): launch before configurationDone
       // - debugpy (requiresLaunchFirst): launch, wait for initialized, set breakpoints, configurationDone
-      const isSocketAdapter = this.config.adapter.transport === "socket";
-      
+      const isSocketAdapter = this.config.adapter.transport === 'socket';
+
       if (requiresLaunchFirst) {
         // debugpy-style DAP flow:
         // 1. Send launch (starts debuggee server but doesn't run code yet)
@@ -293,7 +290,7 @@ export class DebugSession {
         // 5. Wait for launch response
         const launchPromise = this.client.launch(launchConfig);
         await this.waitForInitialized();
-        this.state = "configuring";
+        this.state = 'configuring';
         await this.breakpointManager.setAllBreakpoints();
         await this.setExceptionBreakpoints();
         await this.client.configurationDone();
@@ -308,10 +305,8 @@ export class DebugSession {
         await this.client.configurationDone();
       }
 
-      this.state = "running";
-      this.formatter.emit(
-        this.formatter.createEvent("process_launched", {})
-      );
+      this.state = 'running';
+      this.formatter.emit(this.formatter.createEvent('process_launched', {}));
     }
   }
 
@@ -324,16 +319,16 @@ export class DebugSession {
       const onInitialized = () => {
         resolve();
       };
-      this.client!.once("initialized", onInitialized);
-      
+      this.client!.once('initialized', onInitialized);
+
       // Timeout after 30 seconds
       const timeout = setTimeout(() => {
-        this.client!.removeListener("initialized", onInitialized);
+        this.client!.removeListener('initialized', onInitialized);
         resolve(); // Continue anyway - some adapters may not send this event
       }, 30000);
 
       // Clear timeout if initialized is received
-      this.client!.once("initialized", () => {
+      this.client!.once('initialized', () => {
         clearTimeout(timeout);
       });
     });
@@ -348,7 +343,7 @@ export class DebugSession {
         filters: this.config.exceptionFilters,
       });
       this.formatter.emit(
-        this.formatter.createEvent("exception_breakpoint_set", {
+        this.formatter.createEvent('exception_breakpoint_set', {
           filters: this.config.exceptionFilters,
         })
       );
@@ -358,33 +353,33 @@ export class DebugSession {
   private setupEventHandlers(): void {
     if (!this.client) return;
 
-    this.client.on("stopped", async (body: StoppedEventBody) => {
+    this.client.on('stopped', async (body: StoppedEventBody) => {
       await this.handleStopped(body);
     });
 
-    this.client.on("exited", (body: ExitedEventBody) => {
+    this.client.on('exited', (body: ExitedEventBody) => {
       this.handleExited(body);
     });
 
-    this.client.on("terminated", () => {
+    this.client.on('terminated', () => {
       this.handleTerminated();
     });
 
-    this.client.on("output", (body: OutputEventBody) => {
+    this.client.on('output', (body: OutputEventBody) => {
       this.handleOutput(body);
     });
 
-    this.client.on("error", (error: Error) => {
-      this.formatter.error("Debug adapter error", error.message);
+    this.client.on('error', (error: Error) => {
+      this.formatter.error('Debug adapter error', error.message);
     });
 
-    this.client.on("exit", () => {
+    this.client.on('exit', () => {
       this.handleAdapterExit();
     });
   }
 
   private async handleStopped(body: StoppedEventBody): Promise<void> {
-    this.state = "stopped";
+    this.state = 'stopped';
     const threadId = body.threadId ?? 1;
     const reason = body.reason;
 
@@ -406,7 +401,7 @@ export class DebugSession {
 
       const topFrame = stackResponse.stackFrames[0];
       const location: SourceLocation = {
-        file: topFrame?.source?.path ?? "unknown",
+        file: topFrame?.source?.path ?? 'unknown',
         line: topFrame?.line ?? 0,
         column: topFrame?.column,
         function: topFrame?.name,
@@ -420,7 +415,9 @@ export class DebugSession {
       }
 
       // Run evaluations if specified
-      let evaluations: Record<string, { result: string; type?: string; error?: string }> | undefined;
+      let evaluations:
+        | Record<string, { result: string; type?: string; error?: string }>
+        | undefined;
       if (this.config.evaluations?.length && topFrame) {
         evaluations = await this.variableInspector!.evaluateExpressions(
           topFrame.id,
@@ -429,7 +426,7 @@ export class DebugSession {
       }
 
       // Handle trace step
-      if (reason === "step" && this.isTracing) {
+      if (reason === 'step' && this.isTracing) {
         await this.handleTraceStep(
           threadId,
           location,
@@ -441,7 +438,7 @@ export class DebugSession {
       }
 
       // Handle step completion (non-trace stepping)
-      if (reason === "step" && this.isStepping) {
+      if (reason === 'step' && this.isStepping) {
         this.stepsExecuted++;
         this.remainingSteps--;
 
@@ -467,7 +464,7 @@ export class DebugSession {
         // Emit step_completed event if capturing each step
         if (this.config.captureEachStep) {
           const event: StepCompletedEvent = {
-            type: "step_completed",
+            type: 'step_completed',
             timestamp: new Date().toISOString(),
             threadId,
             location,
@@ -480,34 +477,34 @@ export class DebugSession {
         // If more steps remain, continue stepping
         if (this.remainingSteps > 0) {
           await this.client!.next({ threadId });
-          this.state = "running";
+          this.state = 'running';
           return;
         }
 
         // Done stepping, continue execution
         this.isStepping = false;
         await this.client!.continue({ threadId });
-        this.state = "running";
+        this.state = 'running';
         return;
       }
 
       // Handle exception
-      if (reason === "exception") {
+      if (reason === 'exception') {
         this.exceptionsCaught++;
 
         // If tracing, end the trace first with exception reason
         if (this.isTracing) {
-          await this.endTrace(threadId, "exception", stackTrace, topFrame?.id);
+          await this.endTrace(threadId, 'exception', stackTrace, topFrame?.id);
         }
 
         // Build base exception event
         const event: ExceptionThrownEvent = {
-          type: "exception_thrown",
+          type: 'exception_thrown',
           timestamp: new Date().toISOString(),
           threadId,
           exception: {
-            type: body.text ?? "Exception",
-            message: body.description ?? "Unknown exception",
+            type: body.text ?? 'Exception',
+            message: body.description ?? 'Unknown exception',
           },
           location,
           locals,
@@ -519,7 +516,7 @@ export class DebugSession {
             locals,
             this.config.exceptionChainDepth ?? 10
           );
-          
+
           if (chainResult) {
             event.exceptionChain = chainResult.chain;
             event.rootCause = chainResult.rootCause;
@@ -531,16 +528,16 @@ export class DebugSession {
         // Continue after exception (trace already ended and continued if tracing)
         if (!this.isTracing) {
           await this.client!.continue({ threadId });
-          this.state = "running";
+          this.state = 'running';
         }
         return;
       }
 
       // Handle breakpoint hit
-      if (reason === "breakpoint") {
+      if (reason === 'breakpoint') {
         // If tracing and we hit another breakpoint, end the trace first
         if (this.isTracing) {
-          await this.endTrace(threadId, "breakpoint", stackTrace, topFrame?.id);
+          await this.endTrace(threadId, 'breakpoint', stackTrace, topFrame?.id);
         }
 
         this.breakpointsHit++;
@@ -565,7 +562,7 @@ export class DebugSession {
         }
 
         const event: BreakpointHitEvent = {
-          type: "breakpoint_hit",
+          type: 'breakpoint_hit',
           timestamp: new Date().toISOString(),
           id: body.hitBreakpointIds?.[0],
           threadId,
@@ -587,19 +584,19 @@ export class DebugSession {
           this.remainingSteps = this.config.steps;
           this.isStepping = true;
           await this.client!.next({ threadId });
-          this.state = "running";
+          this.state = 'running';
           return;
         }
 
         // Continue execution after capturing state
         await this.client!.continue({ threadId });
-        this.state = "running";
+        this.state = 'running';
         return;
       }
 
       // Handle other stop reasons (emit as breakpoint_hit for compatibility)
       const event: BreakpointHitEvent = {
-        type: "breakpoint_hit",
+        type: 'breakpoint_hit',
         timestamp: new Date().toISOString(),
         id: body.hitBreakpointIds?.[0],
         threadId,
@@ -612,10 +609,10 @@ export class DebugSession {
 
       // Continue execution after capturing state
       await this.client!.continue({ threadId });
-      this.state = "running";
+      this.state = 'running';
     } catch (error) {
       this.formatter.error(
-        "Failed to handle stopped event",
+        'Failed to handle stopped event',
         error instanceof Error ? error.message : String(error)
       );
 
@@ -631,7 +628,7 @@ export class DebugSession {
   private handleExited(body: ExitedEventBody): void {
     this.exitCode = body.exitCode;
     this.formatter.emit(
-      this.formatter.createEvent("process_exited", {
+      this.formatter.createEvent('process_exited', {
         exitCode: body.exitCode,
         durationMs: Date.now() - this.startTime,
       })
@@ -639,25 +636,25 @@ export class DebugSession {
   }
 
   private handleTerminated(): void {
-    this.state = "terminated";
+    this.state = 'terminated';
     this.endSession();
   }
 
   private handleOutput(body: OutputEventBody): void {
-    if (body.category === "stdout" || body.category === "stderr" || body.category === "console") {
+    if (body.category === 'stdout' || body.category === 'stderr' || body.category === 'console') {
       this.formatter.programOutput(body.category, body.output);
     }
   }
 
   private handleAdapterExit(): void {
-    if (this.state !== "terminated") {
-      this.state = "terminated";
+    if (this.state !== 'terminated') {
+      this.state = 'terminated';
       this.endSession();
     }
   }
 
   private handleTimeout(): void {
-    this.formatter.error("Session timed out", `Timeout after ${this.config.timeout}ms`);
+    this.formatter.error('Session timed out', `Timeout after ${this.config.timeout}ms`);
     this.endSessionWithError(new Error(`Session timed out after ${this.config.timeout}ms`));
   }
 
@@ -740,7 +737,7 @@ export class DebugSession {
     }
 
     const event: TraceStartedEvent = {
-      type: "trace_started",
+      type: 'trace_started',
       timestamp: new Date().toISOString(),
       threadId,
       startLocation: location,
@@ -759,7 +756,7 @@ export class DebugSession {
     } else {
       await this.client!.next({ threadId });
     }
-    this.state = "running";
+    this.state = 'running';
   }
 
   /**
@@ -777,7 +774,7 @@ export class DebugSession {
 
     // Build trace_step event
     const stepEvent: TraceStepEvent = {
-      type: "trace_step",
+      type: 'trace_step',
       timestamp: new Date().toISOString(),
       threadId,
       stepNumber: this.traceStepCount,
@@ -788,10 +785,7 @@ export class DebugSession {
     // Compute variable diff if enabled
     if (this.config.diffVars && frameId) {
       const currentLocals = await this.variableInspector!.getLocals(frameId);
-      const changes = this.variableInspector!.diffVariables(
-        this.previousLocals,
-        currentLocals
-      );
+      const changes = this.variableInspector!.diffVariables(this.previousLocals, currentLocals);
 
       if (changes.length > 0) {
         stepEvent.changes = changes;
@@ -823,10 +817,7 @@ export class DebugSession {
     }
 
     // Check stop conditions
-    const stopReason = await this.checkTraceStopConditions(
-      stackDepth,
-      frameId
-    );
+    const stopReason = await this.checkTraceStopConditions(stackDepth, frameId);
 
     if (stopReason) {
       await this.endTrace(threadId, stopReason, stackFrames, frameId);
@@ -839,7 +830,7 @@ export class DebugSession {
     } else {
       await this.client!.next({ threadId });
     }
-    this.state = "running";
+    this.state = 'running';
   }
 
   /**
@@ -853,12 +844,12 @@ export class DebugSession {
 
     // Check 1: Limit reached
     if (this.traceStepCount >= limit) {
-      return "limit_reached";
+      return 'limit_reached';
     }
 
     // Check 2: Function return (stepped out of initial function)
     if (currentStackDepth < this.traceInitialStackDepth) {
-      return "function_return";
+      return 'function_return';
     }
 
     // Check 3: --trace-until expression
@@ -867,10 +858,10 @@ export class DebugSession {
         const result = await this.client!.evaluate({
           expression: this.config.traceUntil,
           frameId,
-          context: "watch",
+          context: 'watch',
         });
         if (this.isTruthy(result.result)) {
-          return "expression_true";
+          return 'expression_true';
         }
       } catch {
         // Expression evaluation failed - continue tracing
@@ -892,7 +883,7 @@ export class DebugSession {
     this.isTracing = false;
 
     const finalLocation = this.tracePath[this.tracePath.length - 1] ?? {
-      file: "unknown",
+      file: 'unknown',
       line: 0,
     };
 
@@ -912,7 +903,7 @@ export class DebugSession {
     }
 
     const event: TraceCompletedEvent = {
-      type: "trace_completed",
+      type: 'trace_completed',
       timestamp: new Date().toISOString(),
       threadId,
       stopReason: reason,
@@ -936,7 +927,7 @@ export class DebugSession {
 
     // Continue execution after trace
     await this.client!.continue({ threadId });
-    this.state = "running";
+    this.state = 'running';
   }
 
   /**
@@ -944,8 +935,14 @@ export class DebugSession {
    */
   private isTruthy(value: string): boolean {
     const lower = value.toLowerCase();
-    if (lower === "true") return true;
-    if (lower === "false" || lower === "null" || lower === "undefined" || lower === "none" || lower === "nil") {
+    if (lower === 'true') return true;
+    if (
+      lower === 'false' ||
+      lower === 'null' ||
+      lower === 'undefined' ||
+      lower === 'none' ||
+      lower === 'nil'
+    ) {
       return false;
     }
     // Non-zero numbers are truthy
@@ -971,7 +968,7 @@ export class DebugSession {
         const result = await this.client!.evaluate({
           expression: assertion,
           frameId,
-          context: "watch",
+          context: 'watch',
         });
 
         // Assertion fails if result is falsy
@@ -985,7 +982,7 @@ export class DebugSession {
         // Evaluation error = assertion failed
         return {
           assertion,
-          value: "",
+          value: '',
           error: error instanceof Error ? error.message : String(error),
         };
       }
@@ -1013,7 +1010,7 @@ export class DebugSession {
     }
 
     const event: AssertionFailedEvent = {
-      type: "assertion_failed",
+      type: 'assertion_failed',
       timestamp: new Date().toISOString(),
       threadId,
       assertion,
