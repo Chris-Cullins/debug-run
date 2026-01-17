@@ -42,6 +42,13 @@ export interface AdapterConfig {
   /** Port for socket transport (required if transport is "socket") */
   socketPort?: number;
 
+  /**
+   * Requires launch/attach before breakpoints can be set.
+   * Some adapters (like debugpy) don't send the 'initialized' event
+   * until after launch is called, requiring a different DAP flow.
+   */
+  requiresLaunchFirst?: boolean;
+
   /** Function to detect if the adapter is installed */
   detect: () => Promise<string | null>;
 

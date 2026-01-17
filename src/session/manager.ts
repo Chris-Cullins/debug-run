@@ -217,7 +217,7 @@ export class DebugSession {
       deduplicateByContent: !this.config.noDedupe,
     });
 
-    // Add breakpoints
+    // Add breakpoints to the manager (will be set after launch for some adapters)
     for (const bp of this.config.breakpoints) {
       this.breakpointManager.addBreakpoint(bp);
     }
@@ -229,20 +229,14 @@ export class DebugSession {
       }
     }
 
-    // Set breakpoints and logpoints
-    this.state = "configuring";
-    await this.breakpointManager.setAllBreakpoints();
-
-    // Set exception breakpoints
-    if (this.config.exceptionFilters && this.config.exceptionFilters.length > 0) {
-      await this.client.setExceptionBreakpoints({
-        filters: this.config.exceptionFilters,
-      });
-      this.formatter.emit(
-        this.formatter.createEvent("exception_breakpoint_set", {
-          filters: this.config.exceptionFilters,
-        })
-      );
+    // Some adapters (like debugpy) require launch before breakpoints can be set
+    const requiresLaunchFirst = this.config.adapter.requiresLaunchFirst === true;
+    
+    if (!requiresLaunchFirst) {
+      // Standard DAP flow: set breakpoints before launch
+      this.state = "configuring";
+      await this.breakpointManager.setAllBreakpoints();
+      await this.setExceptionBreakpoints();
     }
 
     // Launch or attach
@@ -253,6 +247,14 @@ export class DebugSession {
       });
 
       await this.client.attach(attachConfig);
+
+      if (requiresLaunchFirst) {
+        // Wait for 'initialized' event after attach, then set breakpoints
+        await this.waitForInitialized();
+        this.state = "configuring";
+        await this.breakpointManager.setAllBreakpoints();
+        await this.setExceptionBreakpoints();
+      }
 
       // Signal configuration done
       await this.client.configurationDone();
@@ -276,11 +278,27 @@ export class DebugSession {
         console.error("[Launch config]", JSON.stringify(launchConfig, null, 2));
       }
 
-      // Adapter-specific order: js-debug (socket) needs configurationDone before launch,
-      // vsdbg (stdio) needs launch before configurationDone
+      // Adapter-specific order varies:
+      // - js-debug (socket): configurationDone before launch
+      // - vsdbg (stdio): launch before configurationDone
+      // - debugpy (requiresLaunchFirst): launch, wait for initialized, set breakpoints, configurationDone
       const isSocketAdapter = this.config.adapter.transport === "socket";
       
-      if (isSocketAdapter) {
+      if (requiresLaunchFirst) {
+        // debugpy-style DAP flow:
+        // 1. Send launch (starts debuggee server but doesn't run code yet)
+        // 2. Wait for 'initialized' event (debuggee server is ready)
+        // 3. Set breakpoints (now the server can accept them)
+        // 4. Send configurationDone (signals program can start running)
+        // 5. Wait for launch response
+        const launchPromise = this.client.launch(launchConfig);
+        await this.waitForInitialized();
+        this.state = "configuring";
+        await this.breakpointManager.setAllBreakpoints();
+        await this.setExceptionBreakpoints();
+        await this.client.configurationDone();
+        await launchPromise;
+      } else if (isSocketAdapter) {
         // js-debug requires configurationDone before launch
         await this.client.configurationDone();
         await this.client.launch(launchConfig);
@@ -293,6 +311,46 @@ export class DebugSession {
       this.state = "running";
       this.formatter.emit(
         this.formatter.createEvent("process_launched", {})
+      );
+    }
+  }
+
+  /**
+   * Wait for the 'initialized' event from the debug adapter
+   */
+  private async waitForInitialized(): Promise<void> {
+    return new Promise((resolve) => {
+      // Check if already received (unlikely but possible)
+      const onInitialized = () => {
+        resolve();
+      };
+      this.client!.once("initialized", onInitialized);
+      
+      // Timeout after 30 seconds
+      const timeout = setTimeout(() => {
+        this.client!.removeListener("initialized", onInitialized);
+        resolve(); // Continue anyway - some adapters may not send this event
+      }, 30000);
+
+      // Clear timeout if initialized is received
+      this.client!.once("initialized", () => {
+        clearTimeout(timeout);
+      });
+    });
+  }
+
+  /**
+   * Set exception breakpoints if configured
+   */
+  private async setExceptionBreakpoints(): Promise<void> {
+    if (this.config.exceptionFilters && this.config.exceptionFilters.length > 0) {
+      await this.client!.setExceptionBreakpoints({
+        filters: this.config.exceptionFilters,
+      });
+      this.formatter.emit(
+        this.formatter.createEvent("exception_breakpoint_set", {
+          filters: this.config.exceptionFilters,
+        })
       );
     }
   }

@@ -1,6 +1,6 @@
 ---
 name: debug-run
-description: Programmatically debug code using debug-run CLI with DAP. Use when debugging .NET or Python applications, setting breakpoints, capturing variables, evaluating expressions, or attaching to running processes.
+description: Programmatically debug code using debug-run CLI with DAP. Use when debugging .NET, Python, or JavaScript/TypeScript applications, setting breakpoints, capturing variables, evaluating expressions, or attaching to running processes.
 ---
 
 # debug-run Debugging Skill
@@ -53,6 +53,20 @@ npx debug-run ./bin/Debug/net8.0/MyApp.dll \
 npx debug-run ./main.py \
   -a debugpy \
   -b "src/processor.py:25" \
+  --pretty \
+  -t 30s
+```
+
+### JavaScript/TypeScript Example
+
+```bash
+# First build the TypeScript project
+cd samples/typescript && npm install && npm run build && cd ../..
+
+# Debug the compiled JavaScript
+npx debug-run samples/typescript/dist/index.js \
+  -a node \
+  -b "samples/typescript/src/index.ts:160" \
   --pretty \
   -t 30s
 ```
@@ -310,7 +324,8 @@ debug-run outputs NDJSON events. Key event types:
 
 2. **Adapter selection**:
    - .NET: Use `vsdbg` (most stable, requires VS Code C# extension)
-   - Python: Use `debugpy` (requires `pip install debugpy`)
+   - Python: Use `debugpy` or `python` (uses VS Code Python extension's bundled debugpy, or falls back to pip)
+   - JavaScript/TypeScript: Use `node` or `js` (requires VS Code js-debug extension or `npx debug-run install-adapter node`)
 
 3. **Expression timing**: Expressions evaluate BEFORE the breakpoint line executes. Variables assigned on that line will be null/unset.
 

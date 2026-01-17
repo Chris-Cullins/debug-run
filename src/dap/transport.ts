@@ -136,6 +136,10 @@ export class DapTransport extends EventEmitter {
     const contentLength = Buffer.byteLength(json, "utf-8");
     const header = `${CONTENT_LENGTH_HEADER}${contentLength}${HEADER_DELIMITER}`;
 
+    if (process.env.DEBUG_DAP) {
+      console.error(`[DAP TX] ${json}`);
+    }
+
     this.process.stdin.write(header + json);
     this.emit("sent", message);
   }
@@ -187,6 +191,9 @@ export class DapTransport extends EventEmitter {
   }
 
   private handleMessage(message: ProtocolMessage): void {
+    if (process.env.DEBUG_DAP) {
+      console.error(`[DAP RX] ${JSON.stringify(message)}`);
+    }
     this.emit("message", message);
 
     switch (message.type) {

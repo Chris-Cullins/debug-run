@@ -213,10 +213,53 @@ npx debug-run install-adapter netcoredbg
 
 ### debugpy (Python)
 
-For Python debugging:
+Python debugger using Microsoft's debugpy. Automatically detected if:
+1. VS Code Python extension is installed (ms-python.python) - debugpy is bundled
+2. Or debugpy is installed via pip: `pip install debugpy`
+
 ```bash
-pip install debugpy
+npx debug-run list-adapters
+# Should show: debugpy - Status: installed (VS Code Python extension or pip)
 ```
+
+## Testing with the Python Sample App
+
+```bash
+# Debug Python application with breakpoint
+npx debug-run samples/python/sample_app.py \
+  -a python \
+  -b "samples/python/sample_app.py:185" \
+  --pretty \
+  -t 30s
+```
+
+### Expression Evaluation
+
+```bash
+npx debug-run samples/python/sample_app.py \
+  -a python \
+  -b "samples/python/sample_app.py:188" \
+  -e "subtotal" \
+  -e "tax" \
+  -e "order.order_id" \
+  --pretty \
+  -t 30s
+```
+
+### Good Breakpoint Locations (Python Sample)
+
+| Line | Location | Description |
+|------|----------|-------------|
+| 185 | `process_order` | After variable setup, before loyalty points calculation |
+| 140 | `calculate_discount` | After discount calculation |
+| 298 | `main` | Before processing first order |
+
+### Python-Specific Notes
+
+- Use `-a python` or `-a debugpy` for Python debugging
+- Breakpoints are set AFTER launch (debugpy DAP flow differs from .NET)
+- Python dataclasses show `special variables` which can be filtered
+- Use `justMyCode: false` in launch config to step into library code
 
 ## Important Notes
 
@@ -646,6 +689,11 @@ samples/
 ├── dotnet/           # Console app for testing launch mode
 │   ├── Program.cs    # Order processing simulation
 │   └── SampleApp.csproj
+├── python/           # Python app for testing Python debugging
+│   └── sample_app.py # Order processing simulation (Python)
+├── typescript/       # TypeScript app for testing JS/TS debugging
+│   ├── src/index.ts  # Order processing simulation (TypeScript)
+│   └── tsconfig.json
 ├── nunit/            # NUnit tests for testing test debugging
 │   ├── CalculatorTests.cs  # Calculator class + tests
 │   └── SampleTests.csproj
