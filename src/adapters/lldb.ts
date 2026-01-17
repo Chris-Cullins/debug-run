@@ -6,9 +6,34 @@
  */
 
 import * as path from "node:path";
+import * as fs from "node:fs";
 import type { AdapterConfig, LaunchOptions, AttachOptions } from "./base.js";
 import { commandExists } from "./base.js";
 import { findCodeLLDB } from "../util/vscode-adapters.js";
+
+/**
+ * Check common Homebrew LLVM installation paths on macOS.
+ * Homebrew LLVM is "keg-only" and not symlinked to PATH by default.
+ */
+function findHomebrewLLDB(): string | null {
+  if (process.platform !== "darwin") {
+    return null;
+  }
+
+  // Homebrew paths: Apple Silicon vs Intel
+  const homebrewPaths = [
+    "/opt/homebrew/opt/llvm/bin/lldb-dap",  // Apple Silicon
+    "/usr/local/opt/llvm/bin/lldb-dap",      // Intel Mac
+  ];
+
+  for (const p of homebrewPaths) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+
+  return null;
+}
 
 // Cache the detected path and type
 let cachedPath: string | null = null;
@@ -47,6 +72,14 @@ export const lldbAdapter: AdapterConfig = {
       return lldbVscode;
     }
 
+    // Try Homebrew LLVM on macOS (keg-only, not in PATH by default)
+    const homebrewLldb = findHomebrewLLDB();
+    if (homebrewLldb) {
+      cachedPath = homebrewLldb;
+      cachedType = "lldb-dap";
+      return homebrewLldb;
+    }
+
     // Try CodeLLDB from VS Code extension
     const codeLldbPath = findCodeLLDB();
     if (codeLldbPath) {
@@ -63,18 +96,21 @@ LLDB debugger not found.
 
 Options:
 
-  1. Install LLVM/LLDB (includes lldb-dap):
-     - macOS: xcode-select --install (or brew install llvm)
-     - Ubuntu/Debian: apt install lldb
-     - Fedora: dnf install lldb
-     - The lldb-dap binary should be in your PATH
+  1. Install LLVM via Homebrew (macOS, recommended):
+     brew install llvm
+     (debug-run auto-detects Homebrew LLVM, no PATH changes needed)
 
   2. Install CodeLLDB VS Code extension:
      - Open VS Code
      - Install "CodeLLDB" extension (vadimcn.vscode-lldb)
      - debug-run will use the bundled adapter
 
-  3. Build from source:
+  3. Install LLVM system-wide:
+     - Ubuntu/Debian: apt install lldb llvm
+     - Fedora: dnf install lldb llvm
+     - Ensure lldb-dap is in your PATH
+
+  4. Build from source:
      - Download LLVM from https://releases.llvm.org
      - Build with -DLLDB_ENABLE_DAP=ON
 `.trim(),

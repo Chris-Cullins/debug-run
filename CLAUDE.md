@@ -261,6 +261,60 @@ npx debug-run samples/python/sample_app.py \
 - Python dataclasses show `special variables` which can be filtered
 - Use `justMyCode: false` in launch config to step into library code
 
+### lldb (Rust/C/C++/Swift)
+
+LLDB-based debugger for native code. Automatically detected from:
+1. `lldb-dap` in PATH
+2. Homebrew LLVM on macOS (`brew install llvm`) - auto-detected, no PATH changes needed
+3. CodeLLDB VS Code extension (vadimcn.vscode-lldb)
+
+```bash
+npx debug-run list-adapters
+# Should show: lldb - Status: installed (/opt/homebrew/opt/llvm/bin/lldb-dap)
+```
+
+## Testing with the Rust Sample App
+
+```bash
+# Build the sample first
+cd samples/rust && cargo build && cd ../..
+
+# Debug Rust application with breakpoint
+npx debug-run ./samples/rust/target/debug/sample_app \
+  -a rust \
+  -b "samples/rust/src/main.rs:250" \
+  --pretty \
+  -t 30s
+```
+
+### Expression Evaluation (Rust)
+
+```bash
+npx debug-run ./samples/rust/target/debug/sample_app \
+  -a rust \
+  -b "samples/rust/src/main.rs:250" \
+  -e "final_total" \
+  -e "customer.loyalty_tier" \
+  --pretty \
+  -t 30s
+```
+
+### Good Breakpoint Locations (Rust Sample)
+
+| Line | Location | Description |
+|------|----------|-------------|
+| 250 | `process_order` | After calculations, before formatting result |
+| 175 | `calculate_discount` | Inside discount calculation match |
+| 415 | `main` | Before processing first order |
+
+### Rust-Specific Notes
+
+- Use `-a rust` or `-a lldb` for Rust debugging
+- Rust types display with full module paths (e.g., `sample_app::Order`)
+- Enums show variant names (e.g., `loyalty_tier: "Gold"`)
+- Strings show as `alloc::string::String` with internal `vec` structure
+- First debug session may require macOS permission prompt
+
 ## Important Notes
 
 ### Breakpoint Paths
@@ -273,7 +327,8 @@ Breakpoint paths should be relative to the working directory:
 
 - Use `-a vsdbg` for .NET (most stable)
 - Use `-a netcoredbg` only if vsdbg isn't available
-- Use `-a debugpy` for Python
+- Use `-a debugpy` or `-a python` for Python
+- Use `-a rust` or `-a lldb` for Rust/C/C++
 
 ### Timeout
 
@@ -691,6 +746,9 @@ samples/
 │   └── SampleApp.csproj
 ├── python/           # Python app for testing Python debugging
 │   └── sample_app.py # Order processing simulation (Python)
+├── rust/             # Rust app for testing Rust/LLDB debugging
+│   ├── src/main.rs   # Order processing simulation (Rust)
+│   └── Cargo.toml
 ├── typescript/       # TypeScript app for testing JS/TS debugging
 │   ├── src/index.ts  # Order processing simulation (TypeScript)
 │   └── tsconfig.json
