@@ -75,6 +75,239 @@ function resolveBreakpointPath(file: string, options: PathResolutionOptions = {}
  * @param spec The breakpoint specification string
  * @param pathOptions Options for resolving relative breakpoint paths
  */
+/**
+ * Result of validating a breakpoint specification
+ */
+export interface BreakpointValidationResult {
+  valid: boolean;
+  error?: string;
+  spec?: string;
+}
+
+/**
+ * Validate a breakpoint specification without fully parsing it.
+ * Use this for early validation before starting a debug session.
+ *
+ * @param spec The breakpoint specification string
+ * @returns Validation result with error message if invalid
+ */
+export function validateBreakpointSpec(spec: string): BreakpointValidationResult {
+  const trimmed = spec.trim();
+
+  // Check for empty spec
+  if (!trimmed) {
+    return {
+      valid: false,
+      error: 'Breakpoint specification cannot be empty',
+      spec,
+    };
+  }
+
+  // Check for colon separator (must have at least one)
+  if (!trimmed.includes(':')) {
+    return {
+      valid: false,
+      error: `Invalid breakpoint format "${spec}". Expected "file:line" (e.g., "Program.cs:42")`,
+      spec,
+    };
+  }
+
+  // Match: file:line?condition or file:line#hitCount
+  const match = trimmed.match(/^(.+):(\d+)(?:\?(.+)|#(\d+))?$/);
+
+  if (!match) {
+    // Try to give a more specific error message
+    const colonIdx = trimmed.lastIndexOf(':');
+    if (colonIdx !== -1) {
+      const linePartRaw = trimmed.slice(colonIdx + 1);
+      // Strip any condition/hitCount suffix for error message
+      const linePart = linePartRaw.split('?')[0].split('#')[0];
+
+      if (linePart === '') {
+        return {
+          valid: false,
+          error: `Missing line number in breakpoint "${spec}". Expected "file:line" (e.g., "Program.cs:42")`,
+          spec,
+        };
+      }
+
+      if (!/^\d+$/.test(linePart)) {
+        return {
+          valid: false,
+          error: `Invalid line number "${linePart}" in breakpoint "${spec}". Line must be a positive integer`,
+          spec,
+        };
+      }
+    }
+
+    return {
+      valid: false,
+      error: `Invalid breakpoint format "${spec}". Expected "file:line" (e.g., "Program.cs:42")`,
+      spec,
+    };
+  }
+
+  const [, file, lineStr] = match;
+  const line = parseInt(lineStr, 10);
+
+  // Check for empty file path
+  if (!file || !file.trim()) {
+    return {
+      valid: false,
+      error: `Missing file path in breakpoint "${spec}". Expected "file:line" (e.g., "Program.cs:42")`,
+      spec,
+    };
+  }
+
+  // Check for valid line number (must be positive)
+  if (isNaN(line) || line < 1) {
+    return {
+      valid: false,
+      error: `Invalid line number "${lineStr}" in breakpoint "${spec}". Line must be a positive integer`,
+      spec,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate a logpoint specification without fully parsing it.
+ * Use this for early validation before starting a debug session.
+ *
+ * @param spec The logpoint specification string
+ * @returns Validation result with error message if invalid
+ */
+export function validateLogpointSpec(spec: string): BreakpointValidationResult {
+  const trimmed = spec.trim();
+
+  // Check for empty spec
+  if (!trimmed) {
+    return {
+      valid: false,
+      error: 'Logpoint specification cannot be empty',
+      spec,
+    };
+  }
+
+  // Logpoints must have the pipe separator
+  if (!trimmed.includes('|')) {
+    return {
+      valid: false,
+      error: `Invalid logpoint format "${spec}". Expected "file:line|message" (e.g., "Program.cs:42|value is {x}")`,
+      spec,
+    };
+  }
+
+  // Check for colon separator before pipe
+  const pipeIdx = trimmed.indexOf('|');
+  const beforePipe = trimmed.slice(0, pipeIdx);
+
+  if (!beforePipe.includes(':')) {
+    return {
+      valid: false,
+      error: `Invalid logpoint format "${spec}". Expected "file:line|message" (e.g., "Program.cs:42|value is {x}")`,
+      spec,
+    };
+  }
+
+  // Match: file:line|logMessage
+  const match = trimmed.match(/^(.+):(\d+)\|(.+)$/);
+
+  if (!match) {
+    // Try to give a more specific error message
+    const colonIdx = beforePipe.lastIndexOf(':');
+    if (colonIdx !== -1) {
+      const linePart = beforePipe.slice(colonIdx + 1);
+
+      if (linePart === '') {
+        return {
+          valid: false,
+          error: `Missing line number in logpoint "${spec}". Expected "file:line|message"`,
+          spec,
+        };
+      }
+
+      if (!/^\d+$/.test(linePart)) {
+        return {
+          valid: false,
+          error: `Invalid line number "${linePart}" in logpoint "${spec}". Line must be a positive integer`,
+          spec,
+        };
+      }
+    }
+
+    return {
+      valid: false,
+      error: `Invalid logpoint format "${spec}". Expected "file:line|message" (e.g., "Program.cs:42|value is {x}")`,
+      spec,
+    };
+  }
+
+  const [, file, lineStr, message] = match;
+  const line = parseInt(lineStr, 10);
+
+  // Check for empty file path
+  if (!file || !file.trim()) {
+    return {
+      valid: false,
+      error: `Missing file path in logpoint "${spec}". Expected "file:line|message"`,
+      spec,
+    };
+  }
+
+  // Check for valid line number (must be positive)
+  if (isNaN(line) || line < 1) {
+    return {
+      valid: false,
+      error: `Invalid line number "${lineStr}" in logpoint "${spec}". Line must be a positive integer`,
+      spec,
+    };
+  }
+
+  // Check for empty message
+  if (!message || !message.trim()) {
+    return {
+      valid: false,
+      error: `Missing log message in logpoint "${spec}". Expected "file:line|message"`,
+      spec,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate multiple breakpoint and logpoint specifications.
+ * Returns all validation errors found.
+ *
+ * @param breakpoints Array of breakpoint specifications
+ * @param logpoints Array of logpoint specifications
+ * @returns Array of error messages, empty if all valid
+ */
+export function validateAllBreakpoints(
+  breakpoints: string[],
+  logpoints: string[] = []
+): string[] {
+  const errors: string[] = [];
+
+  for (const bp of breakpoints) {
+    const result = validateBreakpointSpec(bp);
+    if (!result.valid && result.error) {
+      errors.push(result.error);
+    }
+  }
+
+  for (const lp of logpoints) {
+    const result = validateLogpointSpec(lp);
+    if (!result.valid && result.error) {
+      errors.push(result.error);
+    }
+  }
+
+  return errors;
+}
+
 export function parseBreakpointSpec(
   spec: string,
   pathOptions: PathResolutionOptions = {}

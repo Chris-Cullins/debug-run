@@ -18,6 +18,7 @@ import {
   getJsDebugPath,
 } from './util/adapter-installer.js';
 import { launchTestRunner, cleanupTestRunner, type TestRunnerResult } from './util/test-runner.js';
+import { validateAllBreakpoints } from './session/breakpoints.js';
 
 export interface CliOptions {
   adapter: string;
@@ -239,6 +240,19 @@ export function createCli(): Command {
           console.error(`Available adapters: ${getAdapterNames().join(', ')}`);
           process.exit(1);
         }
+
+        // Validate breakpoint and logpoint formats before starting session
+        const breakpointErrors = validateAllBreakpoints(
+          options.breakpoint || [],
+          options.logpoint || []
+        );
+        if (breakpointErrors.length > 0) {
+          for (const error of breakpointErrors) {
+            console.error(`Error: ${error}`);
+          }
+          process.exit(1);
+        }
+
         await runDebugSession({ ...options, program: programPath, adapter: options.adapter });
       }
     );
@@ -301,6 +315,18 @@ async function runTestDebugSession(options: CliOptions & { env?: string[] }): Pr
   if (options.breakpoint.length === 0) {
     console.error('Error: At least one --breakpoint is required for test debugging');
     console.error('Example: -b "path/to/TestFile.cs:42"');
+    process.exit(1);
+  }
+
+  // Validate breakpoint and logpoint formats
+  const breakpointErrors = validateAllBreakpoints(
+    options.breakpoint || [],
+    options.logpoint || []
+  );
+  if (breakpointErrors.length > 0) {
+    for (const error of breakpointErrors) {
+      console.error(`Error: ${error}`);
+    }
     process.exit(1);
   }
 

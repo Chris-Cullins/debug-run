@@ -34,6 +34,25 @@ Check available adapters:
 npx debug-run list-adapters
 ```
 
+## Installing the Skill
+
+To install this skill for AI coding assistants:
+
+```bash
+# Install to Claude Code (~/.claude/skills/)
+npx debug-run install-skill --claude
+
+# Install to GitHub Copilot (~/.copilot/skills/)
+npx debug-run install-skill --copilot
+
+# Install to project directory (for project-specific skills)
+npx debug-run install-skill --claude --project
+npx debug-run install-skill --copilot --project
+
+# Install to custom directory
+npx debug-run install-skill --dir /path/to/skills
+```
+
 ## Language-Specific Guides
 
 For detailed setup, examples, and troubleshooting for each language:

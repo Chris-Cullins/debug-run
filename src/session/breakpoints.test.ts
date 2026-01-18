@@ -4,7 +4,13 @@
 
 import * as path from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { parseBreakpointSpec, parseLogpointSpec } from './breakpoints.js';
+import {
+  parseBreakpointSpec,
+  parseLogpointSpec,
+  validateBreakpointSpec,
+  validateLogpointSpec,
+  validateAllBreakpoints,
+} from './breakpoints.js';
 
 /**
  * Helper to create a platform-independent absolute path for testing.
@@ -120,6 +126,160 @@ describe('parseBreakpointSpec', () => {
         expect(path.normalize(result.file)).toBe(path.normalize(absPath));
       }
     });
+  });
+});
+
+describe('validateBreakpointSpec', () => {
+  describe('valid breakpoints', () => {
+    it('accepts file:line format', () => {
+      const result = validateBreakpointSpec('Program.cs:42');
+      expect(result.valid).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('accepts file:line?condition format', () => {
+      const result = validateBreakpointSpec('test.ts:10?x > 5');
+      expect(result.valid).toBe(true);
+    });
+
+    it('accepts file:line#hitCount format', () => {
+      const result = validateBreakpointSpec('test.ts:20#3');
+      expect(result.valid).toBe(true);
+    });
+
+    it('accepts paths with subdirectories', () => {
+      const result = validateBreakpointSpec('src/utils/helper.ts:100');
+      expect(result.valid).toBe(true);
+    });
+
+    it('trims whitespace', () => {
+      const result = validateBreakpointSpec('  Program.cs:42  ');
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('invalid breakpoints - missing colon', () => {
+    it('rejects missing colon separator', () => {
+      const result = validateBreakpointSpec('Program.cs134');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Expected "file:line"');
+      expect(result.error).toContain('Program.cs:42');
+    });
+
+    it('rejects just a filename', () => {
+      const result = validateBreakpointSpec('test.ts');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Expected "file:line"');
+    });
+  });
+
+  describe('invalid breakpoints - bad line number', () => {
+    it('rejects non-numeric line number', () => {
+      const result = validateBreakpointSpec('Program.cs:abc');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid line number "abc"');
+      expect(result.error).toContain('positive integer');
+    });
+
+    it('rejects negative line number', () => {
+      const result = validateBreakpointSpec('Program.cs:-5');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid line number "-5"');
+    });
+
+    it('rejects zero line number', () => {
+      const result = validateBreakpointSpec('Program.cs:0');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid line number "0"');
+    });
+
+    it('rejects missing line number after colon', () => {
+      const result = validateBreakpointSpec('Program.cs:');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Missing line number');
+    });
+  });
+
+  describe('invalid breakpoints - empty/missing file', () => {
+    it('rejects empty specification', () => {
+      const result = validateBreakpointSpec('');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('cannot be empty');
+    });
+
+    it('rejects whitespace-only specification', () => {
+      const result = validateBreakpointSpec('   ');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('cannot be empty');
+    });
+  });
+});
+
+describe('validateLogpointSpec', () => {
+  describe('valid logpoints', () => {
+    it('accepts file:line|message format', () => {
+      const result = validateLogpointSpec('test.ts:10|value is {x}');
+      expect(result.valid).toBe(true);
+    });
+
+    it('accepts simple message', () => {
+      const result = validateLogpointSpec('app.py:5|checkpoint reached');
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('invalid logpoints', () => {
+    it('rejects missing pipe separator', () => {
+      const result = validateLogpointSpec('test.ts:10');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Expected "file:line|message"');
+    });
+
+    it('rejects missing colon', () => {
+      const result = validateLogpointSpec('test.ts10|message');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Expected "file:line|message"');
+    });
+
+    it('rejects non-numeric line number', () => {
+      const result = validateLogpointSpec('test.ts:abc|message');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid line number');
+    });
+
+    it('rejects empty specification', () => {
+      const result = validateLogpointSpec('');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('cannot be empty');
+    });
+  });
+});
+
+describe('validateAllBreakpoints', () => {
+  it('returns empty array for valid breakpoints', () => {
+    const errors = validateAllBreakpoints(
+      ['Program.cs:42', 'test.ts:10?x > 5'],
+      ['app.py:5|logging']
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it('returns errors for invalid breakpoints', () => {
+    const errors = validateAllBreakpoints(['Program.cs134', 'test.ts:abc']);
+    expect(errors.length).toBe(2);
+    expect(errors[0]).toContain('Program.cs134');
+    expect(errors[1]).toContain('abc');
+  });
+
+  it('returns errors for invalid logpoints', () => {
+    const errors = validateAllBreakpoints([], ['test.ts:10']);
+    expect(errors.length).toBe(1);
+    expect(errors[0]).toContain('file:line|message');
+  });
+
+  it('combines breakpoint and logpoint errors', () => {
+    const errors = validateAllBreakpoints(['invalid'], ['also_invalid']);
+    expect(errors.length).toBe(2);
   });
 });
 
