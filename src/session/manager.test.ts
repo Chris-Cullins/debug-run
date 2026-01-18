@@ -2,7 +2,7 @@
  * Unit tests for DebugSession manager
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { DebugSession } from './manager.js';
 import type { AdapterConfig } from '../adapters/base.js';
 import { OutputFormatter } from '../output/formatter.js';
@@ -15,6 +15,8 @@ const mockAdapter: AdapterConfig = {
   args: [],
   launchConfig: () => ({}),
   attachConfig: () => ({}),
+  detect: async () => null,
+  installHint: 'Test adapter',
 };
 
 describe('DebugSession', () => {
@@ -29,7 +31,11 @@ describe('DebugSession', () => {
           sessionEndCalls.push(summary);
         }),
         emit: vi.fn(),
-        createEvent: vi.fn((type, data) => ({ type, timestamp: new Date().toISOString(), ...data })),
+        createEvent: vi.fn((type, data) => ({
+          type,
+          timestamp: new Date().toISOString(),
+          ...data,
+        })),
         error: vi.fn(),
         programOutput: vi.fn(),
       } as unknown as OutputFormatter;
@@ -68,7 +74,11 @@ describe('DebugSession', () => {
           sessionEndCalls.push(summary);
         }),
         emit: vi.fn(),
-        createEvent: vi.fn((type, data) => ({ type, timestamp: new Date().toISOString(), ...data })),
+        createEvent: vi.fn((type, data) => ({
+          type,
+          timestamp: new Date().toISOString(),
+          ...data,
+        })),
         error: vi.fn(),
         programOutput: vi.fn(),
       } as unknown as OutputFormatter;

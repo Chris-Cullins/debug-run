@@ -218,9 +218,7 @@ describe('OutputFormatter compact mode', () => {
         timestamp: '2025-01-15T10:00:00Z',
         threadId: 1,
         location: { file: '/app/src/order.ts', line: 45, function: 'processOrder' },
-        stackTrace: [
-          { frameId: 1, function: 'processOrder', file: '/app/src/order.ts', line: 45 },
-        ],
+        stackTrace: [{ frameId: 1, function: 'processOrder', file: '/app/src/order.ts', line: 45 }],
         locals,
       };
 
@@ -244,9 +242,7 @@ describe('OutputFormatter compact mode', () => {
         timestamp: '2025-01-15T10:00:00Z',
         threadId: 1,
         location: { file: '/app/src/order.ts', line: 45, function: 'processOrder' },
-        stackTrace: [
-          { frameId: 1, function: 'processOrder', file: '/app/src/order.ts', line: 45 },
-        ],
+        stackTrace: [{ frameId: 1, function: 'processOrder', file: '/app/src/order.ts', line: 45 }],
         locals: {
           order: { type: 'Order', value: { id: 1, total: 100 } },
           customer: { type: 'Customer', value: { name: 'John' } },
@@ -260,9 +256,7 @@ describe('OutputFormatter compact mode', () => {
         timestamp: '2025-01-15T10:00:01Z',
         threadId: 1,
         location: { file: '/app/src/order.ts', line: 50, function: 'processOrder' },
-        stackTrace: [
-          { frameId: 1, function: 'processOrder', file: '/app/src/order.ts', line: 50 },
-        ],
+        stackTrace: [{ frameId: 1, function: 'processOrder', file: '/app/src/order.ts', line: 50 }],
         locals: {
           order: { type: 'Order', value: { id: 1, total: 150 } }, // Changed!
           customer: { type: 'Customer', value: { name: 'John' } }, // Same
