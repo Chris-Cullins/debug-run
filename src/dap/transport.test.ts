@@ -37,7 +37,13 @@ function createMockProcess(): {
     pid: 12345,
   } as unknown as ChildProcess;
 
-  return { process: mockProcess, stdin, stdout, stderr, emit: processEmitter.emit.bind(processEmitter) };
+  return {
+    process: mockProcess,
+    stdin,
+    stdout,
+    stderr,
+    emit: processEmitter.emit.bind(processEmitter),
+  };
 }
 
 // Helper to create a DAP message with Content-Length framing
@@ -218,7 +224,12 @@ describe('DapTransport', () => {
       transport.on('reverseRequest', reverseHandler);
       transport.on('reverseRequest:handshake', specificHandler);
 
-      const message = { seq: 1, type: 'request', command: 'handshake', arguments: { value: 'test' } };
+      const message = {
+        seq: 1,
+        type: 'request',
+        command: 'handshake',
+        arguments: { value: 'test' },
+      };
       mock.stdout.emit('data', createDapMessage(message));
 
       expect(reverseHandler).toHaveBeenCalledWith(message);
@@ -236,7 +247,14 @@ describe('DapTransport', () => {
       expect(sentData).toContain('"command":"initialize"');
 
       // Simulate response
-      const response = { seq: 1, type: 'response', request_seq: 1, command: 'initialize', success: true, body: { result: 'ok' } };
+      const response = {
+        seq: 1,
+        type: 'response',
+        request_seq: 1,
+        command: 'initialize',
+        success: true,
+        body: { result: 'ok' },
+      };
       mock.stdout.emit('data', createDapMessage(response));
 
       const result = await promise;
@@ -246,7 +264,14 @@ describe('DapTransport', () => {
     it('rejects on failure response', async () => {
       const promise = transport.sendRequest('launch', {});
 
-      const response = { seq: 1, type: 'response', request_seq: 1, command: 'launch', success: false, message: 'Failed to launch' };
+      const response = {
+        seq: 1,
+        type: 'response',
+        request_seq: 1,
+        command: 'launch',
+        success: false,
+        message: 'Failed to launch',
+      };
       mock.stdout.emit('data', createDapMessage(response));
 
       await expect(promise).rejects.toThrow('Failed to launch');
@@ -255,7 +280,13 @@ describe('DapTransport', () => {
     it('rejects with generic message when no error message provided', async () => {
       const promise = transport.sendRequest('test', {});
 
-      const response = { seq: 1, type: 'response', request_seq: 1, command: 'test', success: false };
+      const response = {
+        seq: 1,
+        type: 'response',
+        request_seq: 1,
+        command: 'test',
+        success: false,
+      };
       mock.stdout.emit('data', createDapMessage(response));
 
       await expect(promise).rejects.toThrow("Request 'test' failed");
@@ -280,8 +311,22 @@ describe('DapTransport', () => {
       const promise2 = transport.sendRequest<{ id: number }>('second');
 
       // Send responses out of order
-      const response2 = { seq: 2, type: 'response', request_seq: 2, command: 'second', success: true, body: { id: 2 } };
-      const response1 = { seq: 1, type: 'response', request_seq: 1, command: 'first', success: true, body: { id: 1 } };
+      const response2 = {
+        seq: 2,
+        type: 'response',
+        request_seq: 2,
+        command: 'second',
+        success: true,
+        body: { id: 2 },
+      };
+      const response1 = {
+        seq: 1,
+        type: 'response',
+        request_seq: 1,
+        command: 'first',
+        success: true,
+        body: { id: 1 },
+      };
 
       mock.stdout.emit('data', createDapMessage(response2));
       mock.stdout.emit('data', createDapMessage(response1));
