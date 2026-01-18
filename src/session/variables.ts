@@ -108,6 +108,11 @@ export interface VariableInspectorOptions {
    * When enabled, null properties are not included in output, reducing noise.
    */
   omitNullProperties?: boolean;
+  /**
+   * Capture variables from Block and Closure scopes (default: false)
+   * When enabled, variables from these scopes are included. Can produce large output.
+   */
+  captureClosures?: boolean;
 }
 
 export class VariableInspector {
@@ -123,6 +128,7 @@ export class VariableInspector {
       deduplicateByContent: options.deduplicateByContent ?? true,
       compactServices: options.compactServices ?? true,
       omitNullProperties: options.omitNullProperties ?? true,
+      captureClosures: options.captureClosures ?? false,
     };
   }
 
@@ -139,30 +145,68 @@ export class VariableInspector {
     try {
       const scopesResponse = await this.client.scopes({ frameId });
 
+      // Track whether we found a primary locals scope (to conditionally include block/closure)
+      let foundPrimaryLocals = false;
+
       for (const scope of scopesResponse.scopes) {
-        // Only get Locals and Arguments scopes
+        // Categorize scope by name
         // Different adapters use different naming conventions:
         // - netcoredbg/vsdbg: "Locals", "Arguments"
         // - js-debug (node): "Local: functionName", "Block", "Closure"
         // - debugpy: "Locals", "Arguments"
         // - lldb: "Local Variables", "Arguments"
         const scopeLower = scope.name.toLowerCase();
-        if (
+
+        const isPrimaryLocals =
           scopeLower === 'locals' ||
           scopeLower === 'local' ||
           scopeLower.startsWith('local:') ||
-          scopeLower.startsWith('local ') ||
-          scopeLower === 'arguments' ||
-          scopeLower === 'block' ||
-          scopeLower === 'closure'
-        ) {
-          const vars = await this.client.variables({
-            variablesReference: scope.variablesReference,
-            count: this.options.maxCollectionItems,
-          });
+          scopeLower.startsWith('local ');
 
-          for (const v of vars.variables) {
-            result[v.name] = await this.expandVariable(
+        const isArguments = scopeLower === 'arguments' || scopeLower.startsWith('arg');
+
+        const isBlockOrClosure = scopeLower === 'block' || scopeLower === 'closure';
+
+        // Always include primary locals and arguments
+        // Only include block/closure if captureClosures is enabled OR no primary locals found
+        const shouldInclude =
+          isPrimaryLocals ||
+          isArguments ||
+          (isBlockOrClosure && (this.options.captureClosures || !foundPrimaryLocals));
+
+        if (!shouldInclude) continue;
+
+        if (isPrimaryLocals) {
+          foundPrimaryLocals = true;
+        }
+
+        const vars = await this.client.variables({
+          variablesReference: scope.variablesReference,
+          count: this.options.maxCollectionItems,
+        });
+
+        for (const v of vars.variables) {
+          // Handle name collisions across scopes
+          // If name already exists with different value, suffix with scope name
+          let varName = v.name;
+          if (varName in result) {
+            const existingValue = result[varName];
+            const newValue = await this.expandVariable(
+              v,
+              this.options.maxDepth,
+              visited,
+              contentHashes,
+              v.name
+            );
+
+            // Only rename if values differ
+            if (!this.valuesEqual(existingValue, newValue)) {
+              varName = `${v.name} (${scope.name})`;
+              result[varName] = newValue;
+            }
+            // If values are equal, skip the duplicate
+          } else {
+            result[varName] = await this.expandVariable(
               v,
               this.options.maxDepth,
               visited,

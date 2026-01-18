@@ -6,6 +6,15 @@ import * as path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { parseBreakpointSpec, parseLogpointSpec } from './breakpoints.js';
 
+/**
+ * Helper to create a platform-independent absolute path for testing.
+ * On Windows, uses C:\tmp\..., on POSIX uses /tmp/...
+ */
+function makeAbsolutePath(...parts: string[]): string {
+  const root = path.parse(process.cwd()).root;
+  return path.join(root, 'tmp', ...parts);
+}
+
 describe('parseBreakpointSpec', () => {
   describe('basic parsing', () => {
     it('parses file:line format', () => {
@@ -36,38 +45,80 @@ describe('parseBreakpointSpec', () => {
     });
   });
 
-  describe('path resolution without programPath', () => {
-    it('resolves relative paths against cwd when no programPath', () => {
+  describe('path resolution without options', () => {
+    it('resolves relative paths against cwd when no options', () => {
       const result = parseBreakpointSpec('src/file.ts:10');
-      // Should resolve against cwd
-      expect(result.file).toBe(path.resolve('src/file.ts'));
+      expect(path.normalize(result.file)).toBe(path.normalize(path.resolve('src/file.ts')));
     });
 
     it('preserves absolute paths', () => {
-      const result = parseBreakpointSpec('/tmp/test.js:5');
-      expect(result.file).toBe('/tmp/test.js');
+      const absPath = makeAbsolutePath('test.js');
+      const result = parseBreakpointSpec(`${absPath}:5`);
+      expect(path.normalize(result.file)).toBe(path.normalize(absPath));
     });
   });
 
-  describe('path resolution with programPath', () => {
-    it('resolves relative path against program directory when basename matches', () => {
-      const result = parseBreakpointSpec('test.js:3', '/tmp/test.js');
-      expect(result.file).toBe('/tmp/test.js');
+  describe('path resolution with cwd (preferred)', () => {
+    it('resolves relative path against cwd when provided', () => {
+      const cwd = makeAbsolutePath('project');
+      const result = parseBreakpointSpec('src/utils.ts:10', { cwd });
+      const expected = path.join(cwd, 'src/utils.ts');
+      expect(path.normalize(result.file)).toBe(path.normalize(expected));
+    });
+
+    it('cwd takes precedence over programPath', () => {
+      const cwd = makeAbsolutePath('project');
+      const programPath = makeAbsolutePath('other', 'main.ts');
+      const result = parseBreakpointSpec('test.js:3', { cwd, programPath });
+      const expected = path.join(cwd, 'test.js');
+      expect(path.normalize(result.file)).toBe(path.normalize(expected));
+    });
+
+    it('preserves absolute paths even with cwd', () => {
+      const cwd = makeAbsolutePath('project');
+      const absPath = makeAbsolutePath('other', 'path.js');
+      const result = parseBreakpointSpec(`${absPath}:5`, { cwd });
+      expect(path.normalize(result.file)).toBe(path.normalize(absPath));
+    });
+  });
+
+  describe('path resolution with programPath (fallback)', () => {
+    it('resolves relative path against program directory when no cwd', () => {
+      const programPath = makeAbsolutePath('test.js');
+      const result = parseBreakpointSpec('test.js:3', { programPath });
+      expect(path.normalize(result.file)).toBe(path.normalize(programPath));
     });
 
     it('resolves relative path with subdirectory against program directory', () => {
-      const result = parseBreakpointSpec('src/utils.ts:10', '/home/user/project/main.ts');
-      expect(result.file).toBe('/home/user/project/src/utils.ts');
+      const programPath = makeAbsolutePath('project', 'main.ts');
+      const result = parseBreakpointSpec('src/utils.ts:10', { programPath });
+      const expected = makeAbsolutePath('project', 'src', 'utils.ts');
+      expect(path.normalize(result.file)).toBe(path.normalize(expected));
     });
 
     it('preserves absolute paths even with programPath', () => {
-      const result = parseBreakpointSpec('/other/path.js:5', '/tmp/test.js');
-      expect(result.file).toBe('/other/path.js');
+      const programPath = makeAbsolutePath('test.js');
+      const absPath = makeAbsolutePath('other', 'path.js');
+      const result = parseBreakpointSpec(`${absPath}:5`, { programPath });
+      expect(path.normalize(result.file)).toBe(path.normalize(absPath));
     });
+  });
 
-    it('resolves relative path against program directory for different filename', () => {
-      const result = parseBreakpointSpec('helper.ts:15', '/home/user/project/main.ts');
-      expect(result.file).toBe('/home/user/project/helper.ts');
+  describe('Windows drive letter handling', () => {
+    it('correctly parses Windows-style absolute paths', () => {
+      // This tests that the regex correctly handles the colon in drive letters
+      // The last colon should be the line separator
+      if (process.platform === 'win32') {
+        const result = parseBreakpointSpec('C:\\proj\\test.ts:10');
+        expect(result.line).toBe(10);
+        expect(result.file).toBe('C:\\proj\\test.ts');
+      } else {
+        // On non-Windows, just verify normal absolute paths work
+        const absPath = makeAbsolutePath('proj', 'test.ts');
+        const result = parseBreakpointSpec(`${absPath}:10`);
+        expect(result.line).toBe(10);
+        expect(path.normalize(result.file)).toBe(path.normalize(absPath));
+      }
     });
   });
 });
@@ -85,10 +136,20 @@ describe('parseLogpointSpec', () => {
     });
   });
 
+  describe('path resolution with cwd', () => {
+    it('resolves relative path against cwd when provided', () => {
+      const cwd = makeAbsolutePath('project');
+      const result = parseLogpointSpec('test.js:5|logging', { cwd });
+      const expected = path.join(cwd, 'test.js');
+      expect(path.normalize(result.file)).toBe(path.normalize(expected));
+    });
+  });
+
   describe('path resolution with programPath', () => {
-    it('resolves relative path against program directory', () => {
-      const result = parseLogpointSpec('test.js:5|logging', '/tmp/test.js');
-      expect(result.file).toBe('/tmp/test.js');
+    it('resolves relative path against program directory when no cwd', () => {
+      const programPath = makeAbsolutePath('test.js');
+      const result = parseLogpointSpec('test.js:5|logging', { programPath });
+      expect(path.normalize(result.file)).toBe(path.normalize(programPath));
     });
   });
 });

@@ -207,11 +207,10 @@ export class DebugSession {
     });
 
     // Create managers
-    this.breakpointManager = new BreakpointManager(
-      this.client,
-      this.formatter,
-      this.config.program
-    );
+    this.breakpointManager = new BreakpointManager(this.client, this.formatter, {
+      cwd: this.config.cwd,
+      programPath: this.config.program,
+    });
     this.variableInspector = new VariableInspector(this.client, {
       compactServices: !this.config.expandServices,
       omitNullProperties: !this.config.showNullProps,
