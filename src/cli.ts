@@ -56,6 +56,9 @@ export interface CliOptions {
   // Exception handling options
   flattenExceptions?: boolean;
   exceptionChainDepth?: number;
+  // Compact output mode
+  compact?: boolean;
+  stackLimit?: number;
 }
 
 function parseTimeout(value: string): number {
@@ -185,6 +188,17 @@ export function createCli(): Command {
       (val: string) => parseInt(val, 10),
       10
     )
+    // Compact output mode
+    .option(
+      '--compact',
+      'Enable compact output mode for reduced token usage (limits stack traces, filters internals, abbreviates paths)',
+      false
+    )
+    .option(
+      '--stack-limit <count>',
+      'Maximum stack frames to include (default: 3 in compact mode, unlimited otherwise)',
+      (val: string) => parseInt(val, 10)
+    )
     .action(
       async (
         programPath: string | undefined,
@@ -202,6 +216,8 @@ export function createCli(): Command {
           noDedupe?: boolean;
           flattenExceptions?: boolean;
           exceptionChainDepth?: number;
+          compact?: boolean;
+          stackLimit?: number;
         }
       ) => {
         // Handle test runner mode
@@ -432,6 +448,8 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
     stream: outputStream,
     include: options.include,
     exclude: options.exclude,
+    compact: options.compact,
+    stackLimit: options.stackLimit,
   });
 
   // Create and run session

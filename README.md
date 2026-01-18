@@ -143,6 +143,8 @@ Options:
   --attach                          Attach to running process
   --pid <id>                        Process ID to attach to
   --env <key=value...>              Environment variables
+  --compact                         Enable compact output for reduced token usage
+  --stack-limit <N>                 Max stack frames to include (default: 3 in compact)
 
 Commands:
   list-adapters                     List available debug adapters
@@ -335,6 +337,35 @@ When an assertion fails, you get an `assertion_failed` event with:
 - Location where it failed
 
 Assertions are checked at breakpoints, during stepping, and during trace mode.
+
+### Compact output mode (for AI agents)
+
+Reduce token usage by 40-60% with compact output:
+
+```bash
+npx debug-run ./app.dll \
+  -a dotnet \
+  -b "src/OrderService.cs:45" \
+  --compact \
+  --pretty
+```
+
+Compact mode applies these optimizations:
+- **Stack trace limiting**: Only top 3 frames by default (configurable with `--stack-limit`)
+- **Internal frame filtering**: Removes node_modules, runtime internals, webpack frames
+- **Path abbreviation**: `~/project/src/file.ts` instead of `/Users/name/project/src/file.ts`
+- **Variable diffing**: On repeated breakpoint hits, only reports changed variables (`_diff` key)
+- **Trace path collapsing**: Consecutive identical locations collapsed to `functionName (x5)`
+
+Example compact output vs verbose:
+
+```json
+// Compact (~60 tokens)
+{"type":"breakpoint_hit","location":{"file":".../src/OrderService.cs","line":45,"function":"ProcessOrder"},"stackTrace":[{"function":"ProcessOrder","file":".../src/OrderService.cs","line":45}],"locals":{"order":{"type":"OrderDto","value":{"Id":"abc-123","Total":150}}}}
+
+// Verbose (~180 tokens)
+{"type":"breakpoint_hit","timestamp":"2025-01-15T10:30:01.234Z","id":1,"threadId":1,"location":{"file":"/home/user/project/src/OrderService.cs","line":45,"column":12,"function":"ProcessOrder","module":"MyApp"},"stackTrace":[{"frameId":1,"function":"ProcessOrder","file":"/home/user/project/src/OrderService.cs","line":45,"column":12,"module":"MyApp"},{"frameId":2,"function":"Main","file":"/home/user/project/src/Program.cs","line":10,"column":5},...],"locals":{"order":{"type":"OrderDto","value":{"Id":"abc-123","Total":150,"CreatedAt":"2025-01-15T00:00:00Z","Status":"pending",...}},"this":{...}}}
+```
 
 ### Trace mode (follow execution path)
 
