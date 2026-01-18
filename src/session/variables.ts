@@ -141,7 +141,21 @@ export class VariableInspector {
 
       for (const scope of scopesResponse.scopes) {
         // Only get Locals and Arguments scopes
-        if (scope.name === 'Locals' || scope.name === 'Arguments' || scope.name === 'Local') {
+        // Different adapters use different naming conventions:
+        // - netcoredbg/vsdbg: "Locals", "Arguments"
+        // - js-debug (node): "Local: functionName", "Block", "Closure"
+        // - debugpy: "Locals", "Arguments"
+        // - lldb: "Local Variables", "Arguments"
+        const scopeLower = scope.name.toLowerCase();
+        if (
+          scopeLower === 'locals' ||
+          scopeLower === 'local' ||
+          scopeLower.startsWith('local:') ||
+          scopeLower.startsWith('local ') ||
+          scopeLower === 'arguments' ||
+          scopeLower === 'block' ||
+          scopeLower === 'closure'
+        ) {
           const vars = await this.client.variables({
             variablesReference: scope.variablesReference,
             count: this.options.maxCollectionItems,
