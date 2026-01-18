@@ -5,19 +5,28 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { VariableInspector } from './variables.js';
 import type { VariableValue } from '../output/events.js';
+import type { IDapClient } from '../dap/client-interface.js';
+import type { ScopesResponse, VariablesResponse, EvaluateResponse } from '../dap/protocol.js';
+
+// Minimal mock interface for testing - only the methods VariableInspector actually uses
+interface MockDapClient {
+  scopes: () => Promise<ScopesResponse>;
+  variables: () => Promise<VariablesResponse>;
+  evaluate: () => Promise<EvaluateResponse>;
+}
 
 // Mock DapClient with minimal implementation for testing
-const mockClient = {
+const mockClient: MockDapClient = {
   scopes: async () => ({ scopes: [] }),
   variables: async () => ({ variables: [] }),
-  evaluate: async () => ({ result: '' }),
-} as any;
+  evaluate: async () => ({ result: '', variablesReference: 0 }),
+};
 
 describe('VariableInspector', () => {
   let inspector: VariableInspector;
 
   beforeEach(() => {
-    inspector = new VariableInspector(mockClient);
+    inspector = new VariableInspector(mockClient as unknown as IDapClient);
   });
 
   describe('valuesEqual', () => {

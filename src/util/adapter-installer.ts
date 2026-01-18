@@ -136,10 +136,13 @@ export async function installNetcoredbg(onProgress?: (message: string) => void):
   if (!response.ok) {
     throw new Error(`Failed to download netcoredbg: ${response.statusText}`);
   }
+  if (!response.body) {
+    throw new Error('Response body is null');
+  }
 
   // Save to temp file
   const fileStream = createWriteStream(archivePath);
-  await pipeline(Readable.fromWeb(response.body as any), fileStream);
+  await pipeline(Readable.fromWeb(response.body as ReadableStream<Uint8Array>), fileStream);
 
   log('Extracting...');
 
@@ -211,10 +214,13 @@ export async function installJsDebug(onProgress?: (message: string) => void): Pr
   if (!response.ok) {
     throw new Error(`Failed to download js-debug: ${response.statusText}`);
   }
+  if (!response.body) {
+    throw new Error('Response body is null');
+  }
 
   // Save to temp file
   const fileStream = createWriteStream(archivePath);
-  await pipeline(Readable.fromWeb(response.body as any), fileStream);
+  await pipeline(Readable.fromWeb(response.body as ReadableStream<Uint8Array>), fileStream);
 
   log('Extracting...');
 
