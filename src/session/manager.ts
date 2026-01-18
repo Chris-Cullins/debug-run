@@ -122,6 +122,8 @@ export class DebugSession {
   private timeoutHandle: NodeJS.Timeout | null = null;
   /** Error that occurred during session (timeout, etc.) - used to avoid unhandled promise rejections */
   private sessionError: Error | null = null;
+  /** Whether session_end event has been emitted (to prevent duplicate emissions) */
+  private sessionEndEmitted: boolean = false;
 
   constructor(config: SessionConfig, formatter?: OutputFormatter) {
     this.config = config;
@@ -134,6 +136,7 @@ export class DebugSession {
   async run(): Promise<void> {
     this.startTime = Date.now();
     this.sessionError = null;
+    this.sessionEndEmitted = false;
 
     // Emit session start
     if (this.config.attach && this.config.pid) {
@@ -686,14 +689,17 @@ export class DebugSession {
     // Store the error so run() can throw it after promise resolves
     this.sessionError = error;
 
-    // Emit session end
-    this.formatter.sessionEnd({
-      durationMs: Date.now() - this.startTime,
-      exitCode: this.exitCode,
-      breakpointsHit: this.breakpointsHit,
-      exceptionsCaught: this.exceptionsCaught,
-      stepsExecuted: this.stepsExecuted,
-    });
+    // Emit session end (only once)
+    if (!this.sessionEndEmitted) {
+      this.sessionEndEmitted = true;
+      this.formatter.sessionEnd({
+        durationMs: Date.now() - this.startTime,
+        exitCode: this.exitCode,
+        breakpointsHit: this.breakpointsHit,
+        exceptionsCaught: this.exceptionsCaught,
+        stepsExecuted: this.stepsExecuted,
+      });
+    }
 
     // Resolve the session promise (not reject, to avoid unhandled promise rejection
     // if timeout fires during start())
@@ -704,14 +710,17 @@ export class DebugSession {
   }
 
   private endSession(): void {
-    // Emit session end
-    this.formatter.sessionEnd({
-      durationMs: Date.now() - this.startTime,
-      exitCode: this.exitCode,
-      breakpointsHit: this.breakpointsHit,
-      exceptionsCaught: this.exceptionsCaught,
-      stepsExecuted: this.stepsExecuted,
-    });
+    // Emit session end (only once)
+    if (!this.sessionEndEmitted) {
+      this.sessionEndEmitted = true;
+      this.formatter.sessionEnd({
+        durationMs: Date.now() - this.startTime,
+        exitCode: this.exitCode,
+        breakpointsHit: this.breakpointsHit,
+        exceptionsCaught: this.exceptionsCaught,
+        stepsExecuted: this.stepsExecuted,
+      });
+    }
 
     // Resolve the session promise
     if (this.sessionResolve) {
