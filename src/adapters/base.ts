@@ -36,6 +36,9 @@ export interface AdapterConfig {
   /** Arguments for the command */
   args?: string[];
 
+  /** Environment variables for spawning the debug adapter */
+  env?: Record<string, string>;
+
   /** Transport type: "stdio" (default) or "socket" */
   transport?: TransportType;
 

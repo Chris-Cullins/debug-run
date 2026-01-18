@@ -76,6 +76,20 @@ export const debugpyAdapter: AdapterConfig = {
     return ['-m', 'debugpy.adapter'];
   },
 
+  get env() {
+    // If using VS Code bundled debugpy, set PYTHONPATH so Python can find it
+    if (cachedSource === 'vscode' && cachedDebugpyPath) {
+      const debugpyParentDir = path.dirname(cachedDebugpyPath);
+      const existingPythonPath = process.env.PYTHONPATH || '';
+      return {
+        PYTHONPATH: existingPythonPath
+          ? `${debugpyParentDir}:${existingPythonPath}`
+          : debugpyParentDir,
+      };
+    }
+    return undefined;
+  },
+
   detect: async () => {
     // Find a working Python command
     const pythonCmd = await findPythonCommand();

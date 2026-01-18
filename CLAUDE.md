@@ -223,8 +223,9 @@ npx debug-run install-adapter netcoredbg
 ### debugpy (Python)
 
 Python debugger using Microsoft's debugpy. Automatically detected if:
-1. VS Code Python extension is installed (ms-python.python) - debugpy is bundled
-2. Or debugpy is installed via pip: `pip install debugpy`
+1. VS Code debugpy extension is installed (ms-python.debugpy) - recommended
+2. VS Code Python extension is installed (ms-python.python) - older versions bundled debugpy
+3. Or debugpy is installed via pip: `pip install debugpy`
 
 ```bash
 npx debug-run list-adapters

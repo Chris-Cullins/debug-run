@@ -153,13 +153,22 @@ export function findVsdbg(): string | null {
 }
 
 /**
- * Find debugpy from the Python extension
+ * Find debugpy from the Python or debugpy extension
  */
 export function findDebugpy(): string | null {
-  // Try the Python extension
+  // Try the dedicated debugpy extension first (newer VS Code setup)
+  const debugpyExt = findExtension('ms-python.debugpy');
+  if (debugpyExt) {
+    const debugpyPath = path.join(debugpyExt, 'bundled', 'libs', 'debugpy');
+    if (existsSync(debugpyPath)) {
+      return debugpyPath;
+    }
+  }
+
+  // Try the Python extension (older VS Code setup had debugpy bundled)
   const pythonExt = findExtension('ms-python.python');
   if (pythonExt) {
-    // debugpy is bundled with the extension
+    // debugpy may be bundled with the extension
     const possiblePaths = [
       path.join(pythonExt, 'pythonFiles', 'lib', 'python', 'debugpy'),
       path.join(pythonExt, 'bundled', 'libs', 'debugpy'),

@@ -182,7 +182,7 @@ export class DebugSession {
         command: this.config.adapter.command,
         args: this.config.adapter.args,
         cwd: this.config.cwd,
-        env: this.config.env,
+        env: { ...this.config.adapter.env, ...this.config.env },
         port: this.config.adapter.socketPort,
         timeout: this.config.timeout,
       });
@@ -192,7 +192,7 @@ export class DebugSession {
         command: this.config.adapter.command,
         args: this.config.adapter.args,
         cwd: this.config.cwd,
-        env: this.config.env,
+        env: { ...this.config.adapter.env, ...this.config.env },
         timeout: this.config.timeout,
       });
     }
