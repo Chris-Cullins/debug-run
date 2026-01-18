@@ -119,8 +119,9 @@ export class DebugSession {
 
   private sessionPromise: Promise<void> | null = null;
   private sessionResolve: (() => void) | null = null;
-  private _sessionReject: ((error: Error) => void) | null = null;
   private timeoutHandle: NodeJS.Timeout | null = null;
+  /** Error that occurred during session (timeout, etc.) - used to avoid unhandled promise rejections */
+  private sessionError: Error | null = null;
 
   constructor(config: SessionConfig, formatter?: OutputFormatter) {
     this.config = config;
@@ -132,6 +133,7 @@ export class DebugSession {
    */
   async run(): Promise<void> {
     this.startTime = Date.now();
+    this.sessionError = null;
 
     // Emit session start
     if (this.config.attach && this.config.pid) {
@@ -146,9 +148,10 @@ export class DebugSession {
     }
 
     // Create promise to track session completion
-    this.sessionPromise = new Promise((resolve, reject) => {
+    // Note: This promise always resolves (never rejects) to avoid unhandled promise rejections
+    // when timeout fires during start(). Errors are stored in sessionError instead.
+    this.sessionPromise = new Promise((resolve) => {
       this.sessionResolve = resolve;
-      this._sessionReject = reject;
     });
 
     // Set up timeout
@@ -159,13 +162,30 @@ export class DebugSession {
     }
 
     try {
-      await this.start();
+      // Race start() against sessionPromise to handle timeout during startup.
+      // If timeout fires while we're in start(), sessionPromise resolves and we exit the race.
+      await Promise.race([this.start(), this.sessionPromise]);
+
+      // Check if timeout fired during start()
+      if (this.sessionError) {
+        throw this.sessionError;
+      }
+
+      // Wait for session to complete normally
       await this.sessionPromise;
+
+      // Check if session ended with error (e.g., timeout)
+      if (this.sessionError) {
+        throw this.sessionError;
+      }
     } catch (error) {
-      this.formatter.error(
-        'Session failed',
-        error instanceof Error ? error.message : String(error)
-      );
+      // Only emit error if it wasn't already emitted by endSessionWithError
+      if (error !== this.sessionError) {
+        this.formatter.error(
+          'Session failed',
+          error instanceof Error ? error.message : String(error)
+        );
+      }
       throw error;
     } finally {
       await this.cleanup();
@@ -663,6 +683,9 @@ export class DebugSession {
   }
 
   private endSessionWithError(error: Error): void {
+    // Store the error so run() can throw it after promise resolves
+    this.sessionError = error;
+
     // Emit session end
     this.formatter.sessionEnd({
       durationMs: Date.now() - this.startTime,
@@ -672,11 +695,11 @@ export class DebugSession {
       stepsExecuted: this.stepsExecuted,
     });
 
-    // Reject the session promise
-    if (this._sessionReject) {
-      this._sessionReject(error);
+    // Resolve the session promise (not reject, to avoid unhandled promise rejection
+    // if timeout fires during start())
+    if (this.sessionResolve) {
+      this.sessionResolve();
       this.sessionResolve = null;
-      this._sessionReject = null;
     }
   }
 
@@ -694,7 +717,6 @@ export class DebugSession {
     if (this.sessionResolve) {
       this.sessionResolve();
       this.sessionResolve = null;
-      this._sessionReject = null;
     }
   }
 
