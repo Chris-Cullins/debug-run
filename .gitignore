@@ -50,4 +50,6 @@ samples/rust/target/
 # Debugger history files
 .netcoredbg_hist
 *.dbg_hist
+
+# Beads workspace state
 .beads/

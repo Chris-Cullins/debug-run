@@ -24,6 +24,30 @@ export interface TrackedBreakpoint extends BreakpointSpec {
 }
 
 /**
+ * Resolve a breakpoint file path.
+ *
+ * When programPath is provided and the breakpoint file is relative,
+ * resolve it against the program's directory instead of cwd.
+ * This allows users to specify breakpoints like "test.js:3" when debugging
+ * "/tmp/test.js" without needing the absolute path.
+ */
+function resolveBreakpointPath(file: string, programPath?: string): string {
+  // If absolute, use as-is
+  if (path.isAbsolute(file)) {
+    return file;
+  }
+
+  // If we have a program path, resolve relative to its directory
+  if (programPath) {
+    const programDir = path.dirname(programPath);
+    return path.resolve(programDir, file);
+  }
+
+  // Default: resolve against cwd
+  return path.resolve(file);
+}
+
+/**
  * Parse a breakpoint specification string
  *
  * Formats supported:
@@ -31,8 +55,11 @@ export interface TrackedBreakpoint extends BreakpointSpec {
  * - "src/file.ts:45" - with path
  * - "file.ts:45?condition" - with condition
  * - "file.ts:45#3" - with hit count
+ *
+ * @param spec The breakpoint specification string
+ * @param programPath Optional program path to resolve relative breakpoint paths against
  */
-export function parseBreakpointSpec(spec: string): BreakpointSpec {
+export function parseBreakpointSpec(spec: string, programPath?: string): BreakpointSpec {
   // Match: file:line?condition or file:line#hitCount
   const match = spec.match(/^(.+):(\d+)(?:\?(.+)|#(\d+))?$/);
 
@@ -50,7 +77,7 @@ export function parseBreakpointSpec(spec: string): BreakpointSpec {
   }
 
   return {
-    file: path.resolve(file),
+    file: resolveBreakpointPath(file, programPath),
     line,
     condition: condition || undefined,
     hitCondition: hitCount || undefined,
@@ -62,8 +89,11 @@ export function parseBreakpointSpec(spec: string): BreakpointSpec {
  *
  * Format: "file.ts:45|log message with {expr}"
  * The log message can contain expressions in {braces} that will be evaluated.
+ *
+ * @param spec The logpoint specification string
+ * @param programPath Optional program path to resolve relative breakpoint paths against
  */
-export function parseLogpointSpec(spec: string): BreakpointSpec {
+export function parseLogpointSpec(spec: string, programPath?: string): BreakpointSpec {
   // Match: file:line|logMessage
   const match = spec.match(/^(.+):(\d+)\|(.+)$/);
 
@@ -79,7 +109,7 @@ export function parseLogpointSpec(spec: string): BreakpointSpec {
   }
 
   return {
-    file: path.resolve(file),
+    file: resolveBreakpointPath(file, programPath),
     line,
     logMessage: logMessage.trim(),
   };
@@ -90,17 +120,19 @@ export class BreakpointManager {
   private formatter: OutputFormatter;
   private breakpoints: Map<string, TrackedBreakpoint[]> = new Map();
   private nextId: number = 1;
+  private programPath?: string;
 
-  constructor(client: IDapClient, formatter: OutputFormatter) {
+  constructor(client: IDapClient, formatter: OutputFormatter, programPath?: string) {
     this.client = client;
     this.formatter = formatter;
+    this.programPath = programPath;
   }
 
   /**
    * Add a breakpoint from a spec string
    */
   addBreakpoint(spec: string): BreakpointSpec {
-    const bp = parseBreakpointSpec(spec);
+    const bp = parseBreakpointSpec(spec, this.programPath);
     this.addBreakpointSpec(bp);
     return bp;
   }
@@ -109,7 +141,7 @@ export class BreakpointManager {
    * Add a logpoint from a spec string
    */
   addLogpoint(spec: string): BreakpointSpec {
-    const lp = parseLogpointSpec(spec);
+    const lp = parseLogpointSpec(spec, this.programPath);
     this.addBreakpointSpec(lp);
     return lp;
   }
