@@ -210,6 +210,7 @@ export class DebugSession {
     this.breakpointManager = new BreakpointManager(this.client, this.formatter, {
       cwd: this.config.cwd,
       programPath: this.config.program,
+      adapterType: this.config.adapter.name,
     });
     this.variableInspector = new VariableInspector(this.client, {
       compactServices: !this.config.expandServices,

@@ -10,6 +10,7 @@ import {
   validateBreakpointSpec,
   validateLogpointSpec,
   validateAllBreakpoints,
+  getBreakpointSuggestions,
 } from './breakpoints.js';
 
 /**
@@ -315,6 +316,125 @@ describe('parseLogpointSpec', () => {
       // programPath is no longer used; paths resolve against process.cwd()
       const expected = path.resolve('test.js');
       expect(path.normalize(result.file)).toBe(path.normalize(expected));
+    });
+  });
+});
+
+describe('getBreakpointSuggestions', () => {
+  describe('TypeScript with Node.js adapter', () => {
+    it('returns TypeScript-specific suggestions for .ts files', () => {
+      const suggestions = getBreakpointSuggestions('node', '.ts');
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(suggestions.some((s) => s.includes('sourceMap'))).toBe(true);
+      expect(suggestions.some((s) => s.includes('tsconfig.json'))).toBe(true);
+    });
+
+    it('returns TypeScript-specific suggestions for .tsx files', () => {
+      const suggestions = getBreakpointSuggestions('node', '.tsx');
+      expect(suggestions.some((s) => s.includes('sourceMap'))).toBe(true);
+    });
+
+    it('normalizes adapter names (nodejs, javascript, js)', () => {
+      const suggestions1 = getBreakpointSuggestions('nodejs', '.ts');
+      const suggestions2 = getBreakpointSuggestions('javascript', '.ts');
+      const suggestions3 = getBreakpointSuggestions('js', '.ts');
+
+      // All should return TypeScript suggestions
+      expect(suggestions1.some((s) => s.includes('sourceMap'))).toBe(true);
+      expect(suggestions2.some((s) => s.includes('sourceMap'))).toBe(true);
+      expect(suggestions3.some((s) => s.includes('sourceMap'))).toBe(true);
+    });
+  });
+
+  describe('JavaScript with Node.js adapter', () => {
+    it('returns JavaScript-specific suggestions for .js files', () => {
+      const suggestions = getBreakpointSuggestions('node', '.js');
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(suggestions.some((s) => s.includes('executed file'))).toBe(true);
+    });
+
+    it('includes bundler suggestions when source map issue detected', () => {
+      const suggestions = getBreakpointSuggestions('node', '.js', 'Cannot find source map');
+      expect(suggestions.some((s) => s.includes('bundler'))).toBe(true);
+    });
+  });
+
+  describe('.NET with coreclr adapter', () => {
+    it('returns .NET-specific suggestions for .cs files', () => {
+      const suggestions = getBreakpointSuggestions('coreclr', '.cs');
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(suggestions.some((s) => s.includes('PDB'))).toBe(true);
+      expect(suggestions.some((s) => s.includes('Debug'))).toBe(true);
+    });
+
+    it('normalizes adapter names (dotnet, vsdbg, netcoredbg)', () => {
+      const suggestions1 = getBreakpointSuggestions('dotnet', '.cs');
+      const suggestions2 = getBreakpointSuggestions('vsdbg', '.cs');
+      const suggestions3 = getBreakpointSuggestions('netcoredbg', '.cs');
+
+      // All should return .NET suggestions
+      expect(suggestions1.some((s) => s.includes('PDB'))).toBe(true);
+      expect(suggestions2.some((s) => s.includes('PDB'))).toBe(true);
+      expect(suggestions3.some((s) => s.includes('PDB'))).toBe(true);
+    });
+  });
+
+  describe('Python with debugpy adapter', () => {
+    it('returns Python-specific suggestions for .py files', () => {
+      const suggestions = getBreakpointSuggestions('debugpy', '.py');
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(suggestions.some((s) => s.includes('Python interpreter'))).toBe(true);
+    });
+
+    it('normalizes adapter name (python)', () => {
+      const suggestions = getBreakpointSuggestions('python', '.py');
+      expect(suggestions.some((s) => s.includes('interpreter'))).toBe(true);
+    });
+  });
+
+  describe('LLDB adapter', () => {
+    it('returns LLDB-specific suggestions for .c files', () => {
+      const suggestions = getBreakpointSuggestions('lldb', '.c');
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(suggestions.some((s) => s.includes('-g'))).toBe(true);
+    });
+
+    it('returns LLDB-specific suggestions for .cpp files', () => {
+      const suggestions = getBreakpointSuggestions('lldb', '.cpp');
+      expect(suggestions.some((s) => s.includes('debug symbols'))).toBe(true);
+    });
+
+    it('returns LLDB-specific suggestions for .rs (Rust) files', () => {
+      const suggestions = getBreakpointSuggestions('lldb', '.rs');
+      expect(suggestions.some((s) => s.includes('Rust'))).toBe(true);
+    });
+
+    it('normalizes adapter names (codelldb, cpp, c, rust)', () => {
+      const suggestions1 = getBreakpointSuggestions('codelldb', '.c');
+      const suggestions2 = getBreakpointSuggestions('cpp', '.cpp');
+      const suggestions3 = getBreakpointSuggestions('rust', '.rs');
+
+      expect(suggestions1.some((s) => s.includes('-g'))).toBe(true);
+      expect(suggestions2.some((s) => s.includes('-g'))).toBe(true);
+      expect(suggestions3.some((s) => s.includes('Rust'))).toBe(true);
+    });
+  });
+
+  describe('generic fallback', () => {
+    it('returns generic suggestions for unknown adapter', () => {
+      const suggestions = getBreakpointSuggestions('unknown', '.xyz');
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(suggestions.some((s) => s.includes('file path'))).toBe(true);
+    });
+
+    it('returns generic suggestions when adapter is undefined', () => {
+      const suggestions = getBreakpointSuggestions(undefined, '.ts');
+      expect(suggestions.length).toBeGreaterThan(0);
+    });
+
+    it('adds path suggestions when error message mentions "not found"', () => {
+      const suggestions = getBreakpointSuggestions('node', '.ts', 'File not found');
+      expect(suggestions.some((s) => s.includes('file path'))).toBe(true);
     });
   });
 });

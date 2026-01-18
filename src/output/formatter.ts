@@ -4,7 +4,7 @@
  * Serializes debug events to NDJSON for agent consumption.
  */
 
-import type { DebugEvent } from './events.js';
+import type { DebugEvent, BreakpointDiagnostics } from './events.js';
 
 export interface FormatterOptions {
   /** Write to a custom stream (default: stdout) */
@@ -121,7 +121,8 @@ export class OutputFormatter {
     line: number,
     verified: boolean,
     condition?: string,
-    message?: string
+    message?: string,
+    diagnostics?: BreakpointDiagnostics
   ): void {
     this.emit(
       this.createEvent('breakpoint_set', {
@@ -131,6 +132,7 @@ export class OutputFormatter {
         verified,
         condition,
         message,
+        diagnostics,
       })
     );
   }

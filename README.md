@@ -178,6 +178,35 @@ debug-run outputs newline-delimited JSON (NDJSON) events:
 {"type":"session_end","summary":{"breakpointsHit":1,"duration":1234}}
 ```
 
+### Breakpoint Set Event (with Diagnostics)
+
+When a breakpoint cannot be verified (e.g., source mapping issues, missing debug symbols), the event includes actionable diagnostics:
+
+```json
+{
+  "type": "breakpoint_set",
+  "id": 1,
+  "file": "src/handler.ts",
+  "line": 45,
+  "verified": false,
+  "message": "Could not resolve source location",
+  "diagnostics": {
+    "requestedFile": "src/handler.ts",
+    "requestedLine": 45,
+    "adapterMessage": "Could not resolve source location",
+    "suggestions": [
+      "Ensure \"sourceMap\": true in tsconfig.json",
+      "Rebuild with source maps: tsc --sourceMap (or your build command)",
+      "Verify .map files exist in your output directory (e.g., dist/**/*.map)"
+    ],
+    "adapterType": "node",
+    "fileExtension": ".ts"
+  }
+}
+```
+
+Suggestions are context-aware based on the adapter and file type.
+
 ### Breakpoint Hit Event
 
 ```json

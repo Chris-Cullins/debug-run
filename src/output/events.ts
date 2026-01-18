@@ -91,6 +91,22 @@ export interface ProcessExitedEvent extends BaseEvent {
   durationMs: number;
 }
 
+// Breakpoint diagnostics for unverified breakpoints
+export interface BreakpointDiagnostics {
+  /** The file path as originally requested */
+  requestedFile: string;
+  /** The line number as originally requested */
+  requestedLine: number;
+  /** Error message from the debug adapter */
+  adapterMessage?: string;
+  /** Actionable suggestions for fixing the issue */
+  suggestions: string[];
+  /** The adapter type used (e.g., "node", "coreclr", "debugpy") */
+  adapterType?: string;
+  /** File extension of the requested file */
+  fileExtension?: string;
+}
+
 // Breakpoint events
 export interface BreakpointSetEvent extends BaseEvent {
   type: 'breakpoint_set';
@@ -100,6 +116,8 @@ export interface BreakpointSetEvent extends BaseEvent {
   verified: boolean;
   condition?: string;
   message?: string;
+  /** Diagnostics with actionable suggestions when verified is false */
+  diagnostics?: BreakpointDiagnostics;
 }
 
 export interface BreakpointHitEvent extends BaseEvent {

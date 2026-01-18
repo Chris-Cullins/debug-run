@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import type { IDapClient } from '../dap/client-interface.js';
 import type { SourceBreakpoint } from '../dap/protocol.js';
 import type { OutputFormatter } from '../output/formatter.js';
+import type { BreakpointDiagnostics } from '../output/events.js';
 
 export interface BreakpointSpec {
   file: string;
@@ -361,21 +362,28 @@ export function parseLogpointSpec(
   };
 }
 
+export interface BreakpointManagerOptions extends PathResolutionOptions {
+  /** The adapter type for generating context-aware diagnostics */
+  adapterType?: string;
+}
+
 export class BreakpointManager {
   private client: IDapClient;
   private formatter: OutputFormatter;
   private breakpoints: Map<string, TrackedBreakpoint[]> = new Map();
   private nextId: number = 1;
   private pathOptions: PathResolutionOptions;
+  private adapterType?: string;
 
   constructor(
     client: IDapClient,
     formatter: OutputFormatter,
-    pathOptions: PathResolutionOptions = {}
+    options: BreakpointManagerOptions = {}
   ) {
     this.client = client;
     this.formatter = formatter;
-    this.pathOptions = pathOptions;
+    this.pathOptions = options;
+    this.adapterType = options.adapterType;
   }
 
   /**
@@ -428,6 +436,9 @@ export class BreakpointManager {
       logMessage: spec.logMessage,
     }));
 
+    // Store original requested lines before they may be adjusted by the adapter
+    const requestedLines = specs.map((spec) => spec.line);
+
     try {
       const response = await this.client.setBreakpoints({
         source: { path: file },
@@ -443,6 +454,11 @@ export class BreakpointManager {
           specs[i].message = bp.message;
           specs[i].line = bp.line ?? specs[i].line;
 
+          // Generate diagnostics for unverified breakpoints
+          const diagnostics = !bp.verified
+            ? this.generateDiagnostics(file, requestedLines[i], bp.message)
+            : undefined;
+
           // Emit breakpoint_set event
           this.formatter.breakpointSet(
             specs[i].id!,
@@ -450,18 +466,31 @@ export class BreakpointManager {
             specs[i].line,
             specs[i].verified,
             specs[i].condition,
-            specs[i].message
+            specs[i].message,
+            diagnostics
           );
         }
       }
     } catch (error) {
       // Emit error for each breakpoint that failed
-      for (const spec of specs) {
+      for (let i = 0; i < specs.length; i++) {
+        const spec = specs[i];
         spec.id = this.nextId++;
         spec.verified = false;
         spec.message = error instanceof Error ? error.message : 'Failed to set breakpoint';
 
-        this.formatter.breakpointSet(spec.id, file, spec.line, false, spec.condition, spec.message);
+        // Generate diagnostics for the error case
+        const diagnostics = this.generateDiagnostics(file, requestedLines[i], spec.message);
+
+        this.formatter.breakpointSet(
+          spec.id,
+          file,
+          spec.line,
+          false,
+          spec.condition,
+          spec.message,
+          diagnostics
+        );
       }
     }
   }
@@ -496,4 +525,152 @@ export class BreakpointManager {
     // For now, return 0
     return 0;
   }
+
+  /**
+   * Generate diagnostics for an unverified breakpoint
+   */
+  private generateDiagnostics(
+    requestedFile: string,
+    requestedLine: number,
+    adapterMessage?: string
+  ): BreakpointDiagnostics {
+    const ext = path.extname(requestedFile).toLowerCase();
+    const suggestions = getBreakpointSuggestions(this.adapterType, ext, adapterMessage);
+
+    return {
+      requestedFile,
+      requestedLine,
+      adapterMessage,
+      suggestions,
+      adapterType: this.adapterType,
+      fileExtension: ext || undefined,
+    };
+  }
+}
+
+/**
+ * Normalize adapter type to a canonical name for suggestion matching
+ */
+function normalizeAdapterType(adapterType: string | undefined): string | undefined {
+  if (!adapterType) return undefined;
+
+  const lower = adapterType.toLowerCase();
+
+  // .NET adapters
+  if (['dotnet', 'coreclr', 'vsdbg', 'netcoredbg'].includes(lower)) {
+    return 'coreclr';
+  }
+
+  // Node.js adapters
+  if (['node', 'nodejs', 'javascript', 'js', 'typescript', 'ts'].includes(lower)) {
+    return 'node';
+  }
+
+  // Python adapters
+  if (['debugpy', 'python', 'py'].includes(lower)) {
+    return 'python';
+  }
+
+  // LLDB adapters
+  if (['lldb', 'codelldb', 'cpp', 'c', 'rust'].includes(lower)) {
+    return 'lldb';
+  }
+
+  return lower;
+}
+
+/**
+ * Get context-aware suggestions for fixing an unverified breakpoint
+ */
+export function getBreakpointSuggestions(
+  adapterType: string | undefined,
+  fileExtension: string,
+  adapterMessage?: string
+): string[] {
+  const suggestions: string[] = [];
+  const normalizedAdapter = normalizeAdapterType(adapterType);
+  const ext = fileExtension.toLowerCase();
+
+  // Check adapter message for specific hints
+  const msgLower = (adapterMessage || '').toLowerCase();
+  const isSourceMapIssue =
+    msgLower.includes('source map') ||
+    msgLower.includes('sourcemap') ||
+    msgLower.includes('cannot find');
+  const isPathIssue =
+    msgLower.includes('not found') ||
+    msgLower.includes('cannot find file') ||
+    msgLower.includes('does not exist');
+
+  // Node.js / TypeScript suggestions
+  if (normalizedAdapter === 'node') {
+    if (ext === '.ts' || ext === '.tsx') {
+      suggestions.push('Ensure "sourceMap": true in tsconfig.json');
+      suggestions.push('Rebuild with source maps: tsc --sourceMap (or your build command)');
+      suggestions.push('Verify .map files exist in your output directory (e.g., dist/**/*.map)');
+      suggestions.push(
+        'Check that "sourceMaps": true is set in your debug config and "outFiles" points to your built JS files'
+      );
+    } else if (ext === '.js' || ext === '.mjs' || ext === '.cjs') {
+      suggestions.push(
+        'Confirm you are setting the breakpoint in the executed file (built output vs source)'
+      );
+      if (isSourceMapIssue) {
+        suggestions.push(
+          'If using bundlers (webpack/esbuild/vite), ensure source maps are generated and accessible'
+        );
+        suggestions.push('Verify source map files (.map) are not excluded from your output');
+      }
+    }
+  }
+
+  // .NET suggestions
+  else if (normalizedAdapter === 'coreclr') {
+    if (ext === '.cs') {
+      suggestions.push('Build in Debug configuration to ensure PDB files are produced');
+      suggestions.push('Clean and rebuild to refresh symbols: dotnet clean && dotnet build');
+      suggestions.push(
+        'Confirm the running binary matches the source version (stale builds can break mapping)'
+      );
+      suggestions.push('Ensure PDB files are deployed alongside the DLL');
+    }
+  }
+
+  // Python suggestions
+  else if (normalizedAdapter === 'python') {
+    if (ext === '.py') {
+      suggestions.push('Confirm the Python interpreter and working directory match your project');
+      suggestions.push(
+        'If debugging remotely or in containers, configure path mappings (localRoot/remoteRoot)'
+      );
+      suggestions.push(
+        'Verify you are setting the breakpoint in code that actually executes (imported module vs different copy)'
+      );
+    }
+  }
+
+  // LLDB (C/C++/Rust) suggestions
+  else if (normalizedAdapter === 'lldb') {
+    if (['.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.rs', '.m', '.mm'].includes(ext)) {
+      suggestions.push('Compile with debug symbols (-g) and avoid stripping binaries');
+      suggestions.push('Ensure the running binary matches the source used to compile');
+      suggestions.push('For Rust, build with: cargo build (debug mode, not --release)');
+    }
+  }
+
+  // Add path-related suggestions if detected
+  if (isPathIssue) {
+    suggestions.push('Check the file path is correct and exists relative to the provided cwd');
+  }
+
+  // Generic fallback suggestions
+  if (suggestions.length === 0) {
+    suggestions.push('Check the file path is correct and exists relative to the provided cwd');
+    suggestions.push(
+      'Ensure the running program corresponds to this source (no stale build artifacts)'
+    );
+    suggestions.push('Verify the file has been compiled/built with debug information');
+  }
+
+  return suggestions;
 }
