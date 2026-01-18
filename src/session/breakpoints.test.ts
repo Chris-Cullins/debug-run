@@ -88,17 +88,20 @@ describe('parseBreakpointSpec', () => {
     });
   });
 
-  describe('path resolution with programPath (fallback)', () => {
-    it('resolves relative path against program directory when no cwd', () => {
+  describe('path resolution with programPath (no longer used as fallback)', () => {
+    it('resolves relative path against process.cwd when no cwd provided', () => {
       const programPath = makeAbsolutePath('test.js');
       const result = parseBreakpointSpec('test.js:3', { programPath });
-      expect(path.normalize(result.file)).toBe(path.normalize(programPath));
+      // programPath is no longer used; paths resolve against process.cwd()
+      const expected = path.resolve('test.js');
+      expect(path.normalize(result.file)).toBe(path.normalize(expected));
     });
 
-    it('resolves relative path with subdirectory against program directory', () => {
+    it('resolves relative path with subdirectory against process.cwd', () => {
       const programPath = makeAbsolutePath('project', 'main.ts');
       const result = parseBreakpointSpec('src/utils.ts:10', { programPath });
-      const expected = makeAbsolutePath('project', 'src', 'utils.ts');
+      // programPath is no longer used; paths resolve against process.cwd()
+      const expected = path.resolve('src/utils.ts');
       expect(path.normalize(result.file)).toBe(path.normalize(expected));
     });
 
@@ -306,10 +309,12 @@ describe('parseLogpointSpec', () => {
   });
 
   describe('path resolution with programPath', () => {
-    it('resolves relative path against program directory when no cwd', () => {
+    it('resolves relative path against process.cwd when no cwd provided', () => {
       const programPath = makeAbsolutePath('test.js');
       const result = parseLogpointSpec('test.js:5|logging', { programPath });
-      expect(path.normalize(result.file)).toBe(path.normalize(programPath));
+      // programPath is no longer used; paths resolve against process.cwd()
+      const expected = path.resolve('test.js');
+      expect(path.normalize(result.file)).toBe(path.normalize(expected));
     });
   });
 });

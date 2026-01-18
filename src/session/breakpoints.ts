@@ -26,7 +26,7 @@ export interface TrackedBreakpoint extends BreakpointSpec {
 export interface PathResolutionOptions {
   /** Working directory - preferred base for relative paths */
   cwd?: string;
-  /** Program path - fallback base for relative paths (uses dirname) */
+  /** @deprecated Not used - kept for backwards compatibility. Paths resolve against cwd or process.cwd() */
   programPath?: string;
 }
 
@@ -36,11 +36,10 @@ export interface PathResolutionOptions {
  * Resolution order:
  * 1. If file is absolute, use as-is
  * 2. If cwd is provided, resolve relative to cwd (most intuitive for users)
- * 3. If programPath is provided, resolve relative to its directory
- * 4. Default: resolve against process.cwd()
+ * 3. Default: resolve against process.cwd()
  *
  * This allows users to specify breakpoints like "src/file.ts:3" relative to
- * their project root (cwd), or "test.js:3" relative to the program location.
+ * their project root (cwd) or the directory where debug-run was invoked.
  */
 function resolveBreakpointPath(file: string, options: PathResolutionOptions = {}): string {
   // If absolute, use as-is
@@ -53,13 +52,8 @@ function resolveBreakpointPath(file: string, options: PathResolutionOptions = {}
     return path.resolve(options.cwd, file);
   }
 
-  // Fall back to program directory
-  if (options.programPath) {
-    const programDir = path.dirname(options.programPath);
-    return path.resolve(programDir, file);
-  }
-
-  // Default: resolve against process cwd
+  // Default: resolve against process cwd (where user invoked debug-run)
+  // This is the most intuitive behavior for repo-relative paths like "src/file.ts:10"
   return path.resolve(file);
 }
 
