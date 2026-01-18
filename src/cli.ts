@@ -319,10 +319,7 @@ async function runTestDebugSession(options: CliOptions & { env?: string[] }): Pr
   }
 
   // Validate breakpoint and logpoint formats
-  const breakpointErrors = validateAllBreakpoints(
-    options.breakpoint || [],
-    options.logpoint || []
-  );
+  const breakpointErrors = validateAllBreakpoints(options.breakpoint || [], options.logpoint || []);
   if (breakpointErrors.length > 0) {
     for (const error of breakpointErrors) {
       console.error(`Error: ${error}`);

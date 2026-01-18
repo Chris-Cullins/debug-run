@@ -285,10 +285,7 @@ export function validateLogpointSpec(spec: string): BreakpointValidationResult {
  * @param logpoints Array of logpoint specifications
  * @returns Array of error messages, empty if all valid
  */
-export function validateAllBreakpoints(
-  breakpoints: string[],
-  logpoints: string[] = []
-): string[] {
+export function validateAllBreakpoints(breakpoints: string[], logpoints: string[] = []): string[] {
   const errors: string[] = [];
 
   for (const bp of breakpoints) {
