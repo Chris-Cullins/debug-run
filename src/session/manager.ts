@@ -64,6 +64,8 @@ export interface SessionConfig {
   traceUntil?: string;
   /** Show only changed variables in trace steps instead of full dumps */
   diffVars?: boolean;
+  /** Step once before evaluating expressions (for variables assigned on breakpoint line) */
+  evalAfterStep?: boolean;
   // Token efficiency options
   /** Fully expand service-like types instead of compact form (default: false) */
   expandServices?: boolean;
@@ -116,6 +118,15 @@ export class DebugSession {
   private traceInitialStackDepth: number = 0;
   /** Previous locals for variable diffing (only used when diffVars is enabled) */
   private previousLocals: Record<string, VariableValue> = {};
+  /** Whether we are stepping to evaluate expressions after line execution */
+  private isEvalAfterStep: boolean = false;
+  /** Pending data for eval-after-step (original breakpoint data) */
+  private evalAfterStepData: {
+    threadId: number;
+    originalLocation: SourceLocation;
+    originalStackTrace: StackFrameInfo[];
+    breakpointId?: number;
+  } | null = null;
 
   private sessionPromise: Promise<void> | null = null;
   private sessionResolve: (() => void) | null = null;
@@ -441,11 +452,12 @@ export class DebugSession {
         locals = await this.variableInspector!.getLocals(topFrame.id);
       }
 
-      // Run evaluations if specified
+      // Run evaluations if specified (skip for breakpoints when evalAfterStep is enabled)
       let evaluations:
         | Record<string, { result: string; type?: string; error?: string }>
         | undefined;
-      if (this.config.evaluations?.length && topFrame) {
+      const shouldDeferEval = this.config.evalAfterStep && reason === 'breakpoint';
+      if (this.config.evaluations?.length && topFrame && !shouldDeferEval) {
         evaluations = await this.variableInspector!.evaluateExpressions(
           topFrame.id,
           this.config.evaluations
@@ -461,6 +473,80 @@ export class DebugSession {
           stackTrace,
           topFrame?.id
         );
+        return;
+      }
+
+      // Handle eval-after-step completion
+      if (reason === 'step' && this.isEvalAfterStep && this.evalAfterStepData) {
+        this.isEvalAfterStep = false;
+        const pendingData = this.evalAfterStepData;
+        this.evalAfterStepData = null;
+
+        // Now evaluate expressions after the line has executed
+        let evaluations:
+          | Record<string, { result: string; type?: string; error?: string }>
+          | undefined;
+        if (this.config.evaluations?.length && topFrame) {
+          evaluations = await this.variableInspector!.evaluateExpressions(
+            topFrame.id,
+            this.config.evaluations
+          );
+        }
+
+        // Check assertions
+        if (topFrame) {
+          const failed = await this.checkAssertions(topFrame.id);
+          if (failed) {
+            await this.emitAssertionFailed(
+              pendingData.threadId,
+              failed.assertion,
+              failed.value,
+              failed.error,
+              location,
+              stackTrace,
+              topFrame.id
+            );
+            this.endSession();
+            return;
+          }
+        }
+
+        // Emit breakpoint_hit with original location but current evaluations/locals
+        const event: BreakpointHitEvent = {
+          type: 'breakpoint_hit',
+          timestamp: new Date().toISOString(),
+          id: pendingData.breakpointId,
+          threadId: pendingData.threadId,
+          location: pendingData.originalLocation,
+          stackTrace: pendingData.originalStackTrace,
+          locals,
+          evaluations,
+        };
+        this.formatter.emit(event);
+
+        // Start trace mode if configured (takes precedence over steps)
+        if (this.config.trace) {
+          await this.startTrace(
+            pendingData.threadId,
+            location,
+            stackResponse.stackFrames.length,
+            topFrame?.id
+          );
+          return;
+        }
+
+        // If steps are configured, start stepping (steps minus 1 since we already stepped)
+        if (this.config.steps && this.config.steps > 1) {
+          this.remainingSteps = this.config.steps - 1;
+          this.isStepping = true;
+          await this.client!.next({ threadId });
+          this.state = 'running';
+          return;
+        }
+
+        // Continue execution after capturing state
+        await this.client!.continue({ threadId });
+        this.state = 'running';
         return;
       }
 
@@ -568,6 +654,20 @@ export class DebugSession {
         }
 
         this.breakpointsHit++;
+
+        // If evalAfterStep is enabled, step first before evaluating
+        if (this.config.evalAfterStep && this.config.evaluations?.length) {
+          this.isEvalAfterStep = true;
+          this.evalAfterStepData = {
+            threadId,
+            originalLocation: location,
+            originalStackTrace: stackTrace,
+            breakpointId: body.hitBreakpointIds?.[0],
+          };
+          await this.client!.next({ threadId });
+          this.state = 'running';
+          return;
+        }
 
         // Check assertions before emitting breakpoint_hit
         if (topFrame) {

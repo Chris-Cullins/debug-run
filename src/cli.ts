@@ -42,6 +42,7 @@ export interface CliOptions {
   traceLimit?: number;
   traceUntil?: string;
   diffVars?: boolean;
+  evalAfterStep?: boolean;
   output?: string;
   include?: string[];
   exclude?: string[];
@@ -142,6 +143,11 @@ export function createCli(): Command {
     .option(
       '--diff-vars',
       'Show only changed variables in trace steps instead of full dumps',
+      false
+    )
+    .option(
+      '--eval-after-step',
+      'Step once before evaluating expressions (useful for evaluating variables being assigned on the breakpoint line)',
       false
     )
     .option('-o, --output <file>', 'Write events to file instead of stdout')
@@ -476,6 +482,7 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
       traceLimit: options.traceLimit,
       traceUntil: options.traceUntil,
       diffVars: options.diffVars,
+      evalAfterStep: options.evalAfterStep,
       // Token efficiency options
       expandServices: options.expandServices,
       showNullProps: options.showNullProps,
