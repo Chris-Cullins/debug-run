@@ -62,7 +62,7 @@ export interface CliOptions {
   stackLimit?: number;
 }
 
-function parseTimeout(value: string): number {
+export function parseTimeout(value: string): number {
   const match = value.match(/^(\d+)(ms|s|m)?$/);
   if (!match) {
     throw new Error(`Invalid timeout format: ${value}. Use format like "30s", "5000ms", or "2m"`);

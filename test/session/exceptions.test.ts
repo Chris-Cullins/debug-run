@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { flattenExceptionChainFromLocals } from './exceptions.js';
-import type { VariableValue } from '../output/events.js';
+import { flattenExceptionChainFromLocals } from '../../src/session/exceptions.js';
+import type { VariableValue } from '../../src/output/events.js';
 
 describe('flattenExceptionChainFromLocals', () => {
   describe('basic exception parsing', () => {

@@ -3,10 +3,14 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { VariableInspector } from './variables.js';
-import type { VariableValue } from '../output/events.js';
-import type { IDapClient } from '../dap/client-interface.js';
-import type { ScopesResponse, VariablesResponse, EvaluateResponse } from '../dap/protocol.js';
+import { VariableInspector } from '../../src/session/variables.js';
+import type { VariableValue } from '../../src/output/events.js';
+import type { IDapClient } from '../../src/dap/client-interface.js';
+import type {
+  ScopesResponse,
+  VariablesResponse,
+  EvaluateResponse,
+} from '../../src/dap/protocol.js';
 
 // Minimal mock interface for testing - only the methods VariableInspector actually uses
 interface MockDapClient {

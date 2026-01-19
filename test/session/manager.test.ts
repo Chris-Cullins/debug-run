@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { DebugSession } from './manager.js';
-import type { AdapterConfig } from '../adapters/base.js';
-import { OutputFormatter } from '../output/formatter.js';
+import { DebugSession } from '../../src/session/manager.js';
+import type { AdapterConfig } from '../../src/adapters/base.js';
+import { OutputFormatter } from '../../src/output/formatter.js';
 
 // Mock adapter config
 const mockAdapter: AdapterConfig = {

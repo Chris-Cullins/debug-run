@@ -4,10 +4,12 @@
 
 import * as path from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { nodeAdapter } from './node.js';
-import { debugpyAdapter } from './debugpy.js';
-import { netcoredbgAdapter } from './netcoredbg.js';
-import type { LaunchOptions, AttachOptions } from './base.js';
+import { nodeAdapter } from '../../src/adapters/node.js';
+import { debugpyAdapter } from '../../src/adapters/debugpy.js';
+import { netcoredbgAdapter } from '../../src/adapters/netcoredbg.js';
+import { lldbAdapter } from '../../src/adapters/lldb.js';
+import { vsdbgAdapter } from '../../src/adapters/vsdbg.js';
+import type { LaunchOptions, AttachOptions } from '../../src/adapters/base.js';
 
 describe('Node.js Adapter', () => {
   describe('properties', () => {
@@ -381,6 +383,253 @@ describe('.NET (netcoredbg) Adapter', () => {
       expect(config.type).toBe('coreclr');
       expect(config.request).toBe('attach');
       expect(config.processId).toBe(99999);
+    });
+  });
+});
+
+describe('LLDB Adapter', () => {
+  describe('properties', () => {
+    it('has correct adapter ID', () => {
+      expect(lldbAdapter.id).toBe('lldb');
+    });
+
+    it('has correct adapter name', () => {
+      expect(lldbAdapter.name).toBe('lldb');
+    });
+
+    it('has exception filters defined for C++/ObjC/Swift', () => {
+      expect(lldbAdapter.exceptionFilters).toBeDefined();
+      expect(lldbAdapter.exceptionFilters).toContain('cpp_throw');
+      expect(lldbAdapter.exceptionFilters).toContain('cpp_catch');
+      expect(lldbAdapter.exceptionFilters).toContain('objc_throw');
+      expect(lldbAdapter.exceptionFilters).toContain('swift_throw');
+    });
+  });
+
+  describe('launchConfig', () => {
+    it('creates basic launch configuration', () => {
+      const options: LaunchOptions = {
+        program: 'target/debug/myapp',
+      };
+
+      const config = lldbAdapter.launchConfig(options);
+
+      expect(config.request).toBe('launch');
+      expect(config.program).toContain('myapp');
+    });
+
+    it('resolves program path to absolute', () => {
+      const options: LaunchOptions = {
+        program: 'target/debug/myapp',
+      };
+
+      const config = lldbAdapter.launchConfig(options);
+
+      expect(path.isAbsolute(config.program as string)).toBe(true);
+    });
+
+    it('includes args when provided', () => {
+      const options: LaunchOptions = {
+        program: 'myapp',
+        args: ['--verbose', '--config', 'test.json'],
+      };
+
+      const config = lldbAdapter.launchConfig(options);
+
+      expect(config.args).toEqual(['--verbose', '--config', 'test.json']);
+    });
+
+    it('uses cwd when provided', () => {
+      const options: LaunchOptions = {
+        program: 'myapp',
+        cwd: '/project/build',
+      };
+
+      const config = lldbAdapter.launchConfig(options);
+
+      expect(config.cwd).toBe('/project/build');
+    });
+
+    it('defaults cwd to program directory', () => {
+      const options: LaunchOptions = {
+        program: '/project/target/debug/myapp',
+      };
+
+      const config = lldbAdapter.launchConfig(options);
+
+      expect(config.cwd).toBe('/project/target/debug');
+    });
+
+    it('sets stopOnEntry when requested', () => {
+      const options: LaunchOptions = {
+        program: 'myapp',
+        stopAtEntry: true,
+      };
+
+      const config = lldbAdapter.launchConfig(options);
+
+      expect(config.stopOnEntry).toBe(true);
+    });
+
+    it('includes environment variables', () => {
+      const options: LaunchOptions = {
+        program: 'myapp',
+        env: { RUST_BACKTRACE: '1', LOG_LEVEL: 'debug' },
+      };
+
+      const config = lldbAdapter.launchConfig(options);
+
+      expect(config.env).toEqual({ RUST_BACKTRACE: '1', LOG_LEVEL: 'debug' });
+    });
+  });
+
+  describe('attachConfig', () => {
+    it('creates basic attach configuration', () => {
+      const options: AttachOptions = {
+        pid: 11111,
+      };
+
+      const config = lldbAdapter.attachConfig(options);
+
+      expect(config.request).toBe('attach');
+      expect(config.pid).toBe(11111);
+    });
+  });
+});
+
+describe('.NET (vsdbg) Adapter', () => {
+  describe('properties', () => {
+    it('has correct adapter ID', () => {
+      expect(vsdbgAdapter.id).toBe('coreclr');
+    });
+
+    it('has correct adapter name', () => {
+      expect(vsdbgAdapter.name).toBe('vsdbg');
+    });
+
+    it('uses vscode interpreter mode', () => {
+      expect(vsdbgAdapter.args).toContain('--interpreter=vscode');
+    });
+
+    it('has exception filters defined', () => {
+      expect(vsdbgAdapter.exceptionFilters).toBeDefined();
+      expect(vsdbgAdapter.exceptionFilters).toContain('all');
+      expect(vsdbgAdapter.exceptionFilters).toContain('user-unhandled');
+    });
+  });
+
+  describe('launchConfig', () => {
+    it('creates basic launch configuration', () => {
+      const options: LaunchOptions = {
+        program: 'bin/Debug/net8.0/MyApp.dll',
+      };
+
+      const config = vsdbgAdapter.launchConfig(options);
+
+      expect(config.type).toBe('coreclr');
+      expect(config.request).toBe('launch');
+      expect(config.program).toContain('MyApp.dll');
+    });
+
+    it('resolves program path to absolute', () => {
+      const options: LaunchOptions = {
+        program: 'bin/Debug/MyApp.dll',
+      };
+
+      const config = vsdbgAdapter.launchConfig(options);
+
+      expect(path.isAbsolute(config.program as string)).toBe(true);
+    });
+
+    it('includes args when provided', () => {
+      const options: LaunchOptions = {
+        program: 'MyApp.dll',
+        args: ['--environment', 'Development'],
+      };
+
+      const config = vsdbgAdapter.launchConfig(options);
+
+      expect(config.args).toEqual(['--environment', 'Development']);
+    });
+
+    it('uses cwd when provided', () => {
+      const options: LaunchOptions = {
+        program: 'MyApp.dll',
+        cwd: '/app/bin',
+      };
+
+      const config = vsdbgAdapter.launchConfig(options);
+
+      expect(config.cwd).toBe('/app/bin');
+    });
+
+    it('defaults cwd to program directory', () => {
+      const options: LaunchOptions = {
+        program: '/app/bin/Debug/MyApp.dll',
+      };
+
+      const config = vsdbgAdapter.launchConfig(options);
+
+      expect(config.cwd).toBe('/app/bin/Debug');
+    });
+
+    it('sets stopAtEntry when requested', () => {
+      const options: LaunchOptions = {
+        program: 'MyApp.dll',
+        stopAtEntry: true,
+      };
+
+      const config = vsdbgAdapter.launchConfig(options);
+
+      expect(config.stopAtEntry).toBe(true);
+    });
+
+    it('includes vsdbg-specific options', () => {
+      const options: LaunchOptions = {
+        program: 'MyApp.dll',
+      };
+
+      const config = vsdbgAdapter.launchConfig(options);
+
+      expect(config.justMyCode).toBe(true);
+      expect(config.enableStepFiltering).toBe(true);
+      expect(config.console).toBe('internalConsole');
+    });
+
+    it('includes symbol and logging options', () => {
+      const options: LaunchOptions = {
+        program: 'MyApp.dll',
+      };
+
+      const config = vsdbgAdapter.launchConfig(options);
+
+      expect(config.symbolOptions).toBeDefined();
+      expect(config.logging).toBeDefined();
+    });
+  });
+
+  describe('attachConfig', () => {
+    it('creates basic attach configuration', () => {
+      const options: AttachOptions = {
+        pid: 22222,
+      };
+
+      const config = vsdbgAdapter.attachConfig(options);
+
+      expect(config.type).toBe('coreclr');
+      expect(config.request).toBe('attach');
+      expect(config.processId).toBe(22222);
+    });
+
+    it('sets justMyCode to false for attach mode', () => {
+      const options: AttachOptions = {
+        pid: 22222,
+      };
+
+      const config = vsdbgAdapter.attachConfig(options);
+
+      // justMyCode should be false for attach mode (especially for test debugging)
+      expect(config.justMyCode).toBe(false);
     });
   });
 });

@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { DapTransport } from './transport.js';
+import { DapTransport } from '../../src/dap/transport.js';
 import { EventEmitter } from 'node:events';
 import type { ChildProcess } from 'node:child_process';
 

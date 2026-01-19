@@ -24,6 +24,22 @@ npm install
 npx tsx ./src/index.ts --help
 ```
 
+## Pre-commit Hooks & Testing
+
+This project has a pre-commit hook that runs **typecheck, unit tests, and linting** before every commit. Commits will be blocked if any tests fail.
+
+### For AI Agents Adding Tests
+
+**Be careful when adding new tests** - broken or slow tests will block all commits and slow down development:
+
+1. **Always run `npm run test:run` before committing** to verify tests pass
+2. **Keep tests fast** - unit tests should complete in milliseconds, not seconds
+3. **Don't add flaky tests** - tests must pass consistently, not intermittently
+4. **Mock external dependencies** - don't make network calls, file system operations outside temp dirs, or spawn processes in unit tests
+5. **Test files go in `test/`** - mirror the `src/` directory structure (e.g., `src/foo/bar.ts` -> `test/foo/bar.test.ts`)
+
+If you accidentally break tests and need to commit urgently, you can bypass with `git commit --no-verify` but this should be avoided.
+
 ## Building the Sample .NET App
 
 Before testing, build the sample application:

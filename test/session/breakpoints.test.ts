@@ -11,7 +11,7 @@ import {
   validateLogpointSpec,
   validateAllBreakpoints,
   getBreakpointSuggestions,
-} from './breakpoints.js';
+} from '../../src/session/breakpoints.js';
 
 /**
  * Helper to create a platform-independent absolute path for testing.

@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { OutputFormatter } from './formatter.js';
+import { OutputFormatter } from '../../src/output/formatter.js';
 import { Writable } from 'stream';
-import type { BreakpointHitEvent, StackFrameInfo, VariableValue } from './events.js';
+import type { BreakpointHitEvent, StackFrameInfo, VariableValue } from '../../src/output/events.js';
 
 // Helper to capture output
 function createCaptureStream(): { stream: Writable; getOutput: () => string[] } {
