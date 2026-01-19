@@ -206,9 +206,10 @@ export class DapClient extends EventEmitter {
 
     this.capabilities = response?.capabilities || response || {};
 
-    // Wait for the initialized event (with a timeout to handle adapters that don't send it)
+    // Wait for the initialized event (with a short timeout)
+    // vsdbg sends this event AFTER launch, so we use a short timeout and continue anyway
     const timeoutPromise = new Promise<void>((_, reject) => {
-      setTimeout(() => reject(new Error('Timeout waiting for initialized event')), 10000);
+      setTimeout(() => reject(new Error('Timeout waiting for initialized event')), 500);
     });
 
     try {
