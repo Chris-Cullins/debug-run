@@ -770,6 +770,23 @@ samples/
         └── Program.cs  # Minimal API with orders endpoints
 ```
 
+## Adapter Storage Location
+
+Debug adapters installed via `debug-run install-adapter` are stored in:
+
+```
+~/.debug-run/adapters/
+├── js-debug/        # Node.js/TypeScript debugger
+├── netcoredbg/      # .NET debugger (open-source alternative to vsdbg)
+└── ...
+```
+
+This location:
+- Works for npm global installs, npx, and local development
+- Survives package updates
+- Is user-specific (no root/admin permissions needed)
+- Can be overridden with `DEBUG_RUN_HOME` environment variable
+
 ## Token Efficiency (LLM Optimization)
 
 debug-run is optimized for consumption by LLMs. Several features reduce token usage without sacrificing debugging utility:

@@ -12,7 +12,6 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
-import { fileURLToPath } from 'node:url';
 
 const execAsync = promisify(exec);
 
@@ -90,14 +89,30 @@ function getDownloadUrl(): string {
 }
 
 /**
- * Get the path to the bundled adapters directory
+ * Get the debug-run home directory for storing adapters and other data.
+ * Uses ~/.debug-run by default, can be overridden with DEBUG_RUN_HOME env var.
+ *
+ * This is similar to how other dev tools work:
+ * - rustup uses ~/.rustup
+ * - nvm uses ~/.nvm
+ * - sdkman uses ~/.sdkman
+ */
+export function getDebugRunHome(): string {
+  // Allow override via environment variable
+  if (process.env.DEBUG_RUN_HOME) {
+    return process.env.DEBUG_RUN_HOME;
+  }
+
+  // Default to ~/.debug-run
+  return path.join(os.homedir(), '.debug-run');
+}
+
+/**
+ * Get the path to the adapters directory.
+ * Adapters are stored in ~/.debug-run/adapters/
  */
 export function getAdaptersDir(): string {
-  // Use a directory relative to the package
-  // Use fileURLToPath for cross-platform compatibility (Windows needs this)
-  const currentFilePath = fileURLToPath(import.meta.url);
-  const packageRoot = path.resolve(path.dirname(currentFilePath), '..', '..');
-  return path.join(packageRoot, 'bin', 'adapters');
+  return path.join(getDebugRunHome(), 'adapters');
 }
 
 /**
