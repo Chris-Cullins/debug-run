@@ -78,7 +78,7 @@ export function findVsdbg(): string | null {
     const vsdbgDirs: string[] = [];
 
     if (platform === 'win32') {
-      vsdbgDirs.push('vsdbg', 'win32', 'x64', 'x86');
+      vsdbgDirs.push('vsdbg', 'win32', 'x64', 'x86', 'x86_64');
     } else if (platform === 'darwin') {
       // Newer extensions use just "arm64" or "x86_64"
       vsdbgDirs.push(
