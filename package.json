@@ -24,11 +24,14 @@
   },
   "dependencies": {
     "@vscode/debugprotocol": "^1.65.0",
+    "adm-zip": "^0.5.16",
     "chalk": "^5.0.0",
     "commander": "^12.0.0",
-    "glob": "^10.0.0"
+    "glob": "^10.0.0",
+    "tar": "^7.5.4"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^20.0.0",
     "bun-types": "^1.0.0",
     "esbuild": "^0.27.2",

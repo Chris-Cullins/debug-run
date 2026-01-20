@@ -6,14 +6,12 @@
 
 import { createWriteStream, existsSync, chmodSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
-
-const execAsync = promisify(exec);
+import AdmZip from 'adm-zip';
+import * as tar from 'tar';
 
 // netcoredbg release info
 const NETCOREDBG_VERSION = '3.1.3-1062';
@@ -161,11 +159,16 @@ export async function installNetcoredbg(onProgress?: (message: string) => void):
 
   log('Extracting...');
 
-  // Extract the archive
+  // Extract the archive using cross-platform libraries
   if (info.archiveExt === 'zip') {
-    await execAsync(`unzip -o "${archivePath}" -d "${netcoredbgDir}"`);
+    const zip = new AdmZip(archivePath);
+    zip.extractAllTo(netcoredbgDir, true);
   } else {
-    await execAsync(`tar -xzf "${archivePath}" -C "${netcoredbgDir}" --strip-components=1`);
+    await tar.x({
+      file: archivePath,
+      cwd: netcoredbgDir,
+      strip: 1,
+    });
   }
 
   // Make executable
@@ -247,7 +250,10 @@ export async function installJsDebug(onProgress?: (message: string) => void): Pr
   await mkdir(adaptersDir, { recursive: true });
 
   // Extract to adapters dir (it will create js-debug/ inside)
-  await execAsync(`tar -xzf "${archivePath}" -C "${adaptersDir}"`);
+  await tar.x({
+    file: archivePath,
+    cwd: adaptersDir,
+  });
 
   // Clean up
   await rm(archivePath, { force: true });
