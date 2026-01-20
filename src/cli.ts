@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import { Command, Option } from 'commander';
 import { getAdapter, getAdapterNames } from './adapters/index.js';
 import { DebugSession } from './session/manager.js';
@@ -18,6 +19,10 @@ import {
   getJsDebugPath,
 } from './util/adapter-installer.js';
 import { launchTestRunner, cleanupTestRunner, type TestRunnerResult } from './util/test-runner.js';
+
+const require = createRequire(import.meta.url);
+const packageJson = require('../package.json');
+const VERSION = packageJson.version;
 import { validateAllBreakpoints } from './session/breakpoints.js';
 
 export interface CliOptions {
@@ -89,7 +94,7 @@ export function createCli(): Command {
   program
     .name('debug-run')
     .description('CLI tool enabling AI agents to programmatically debug code via DAP')
-    .version('0.1.0');
+    .version(VERSION);
 
   // Main debug command (default)
   program
