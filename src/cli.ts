@@ -519,9 +519,7 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
     try {
       sourceMapOverrides = parseSourceMapOverrides(options.sourceMapOverrides, workspaceFolder);
     } catch (error) {
-      console.error(
-        `Error: ${error instanceof Error ? error.message : error}`
-      );
+      console.error(`Error: ${error instanceof Error ? error.message : error}`);
       console.error(`Available presets: ${getPresetNames().join(', ')}`);
       process.exit(1);
     }

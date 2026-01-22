@@ -290,9 +290,7 @@ function resolveSourcePath(
   }
 
   if (source.startsWith('webpack://') || source.startsWith('file://')) {
-    const stripped = source
-      .replace(/^webpack:\/\/[^/]*\//, '')
-      .replace(/^file:\/\//, '');
+    const stripped = source.replace(/^webpack:\/\/[^/]*\//, '').replace(/^file:\/\//, '');
     return path.resolve(workspaceRoot, stripped);
   }
 
@@ -346,7 +344,9 @@ export function formatDiagnoseReport(result: DiagnoseResult, verbose: boolean): 
       if (map.error) {
         lines.push(`  Error: ${map.error}`);
       }
-      lines.push(`  Sources: ${map.sourcesTotal} total, ${map.sourcesResolved} resolved, ${map.sourcesMissing} missing`);
+      lines.push(
+        `  Sources: ${map.sourcesTotal} total, ${map.sourcesResolved} resolved, ${map.sourcesMissing} missing`
+      );
 
       if (map.sourcesMissing > 0) {
         lines.push('  Missing sources:');
