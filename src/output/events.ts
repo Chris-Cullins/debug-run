@@ -11,6 +11,10 @@ export interface SourceLocation {
   column?: number;
   function?: string;
   module?: string;
+  /** For generated/virtual sources without a file path (Phase 4) */
+  sourceReference?: number;
+  /** Name hint for generated sources */
+  sourceName?: string;
 }
 
 // Variable representation
@@ -41,6 +45,10 @@ export interface StackFrameInfo {
   line: number | null;
   column?: number | null;
   module?: string;
+  /** For generated/virtual sources without a file path (Phase 4) */
+  sourceReference?: number;
+  /** Name hint for generated sources */
+  sourceName?: string;
 }
 
 // Base event type

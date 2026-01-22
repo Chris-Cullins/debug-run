@@ -253,6 +253,17 @@ export interface ThreadsResponse {
   threads: Thread[];
 }
 
+// Source request for retrieving virtual/generated source content (Phase 4)
+export interface SourceArguments {
+  source?: Source;
+  sourceReference: number;
+}
+
+export interface SourceResponse {
+  content: string;
+  mimeType?: string;
+}
+
 export interface ContinueResponse {
   allThreadsContinued?: boolean;
 }

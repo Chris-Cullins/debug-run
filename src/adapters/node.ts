@@ -102,6 +102,10 @@ Alternative options:
     autoAttachChildProcesses: false,
     // Wait for source maps to load before running
     pauseForSourceMap: true,
+    // Source map path overrides for TypeScript/bundled code
+    ...(options.sourceMapOverrides && {
+      sourceMapPathOverrides: options.sourceMapOverrides,
+    }),
   }),
 
   attachConfig: (options: AttachOptions) => ({

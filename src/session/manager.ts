@@ -78,6 +78,9 @@ export interface SessionConfig {
   flattenExceptions?: boolean;
   /** Maximum depth to traverse exception chain (default: 10) */
   exceptionChainDepth?: number;
+  // Source map options
+  /** Source map path overrides for TypeScript/bundled code */
+  sourceMapOverrides?: Record<string, string>;
 }
 
 type SessionState =
@@ -307,6 +310,7 @@ export class DebugSession {
         args: this.config.args,
         cwd: this.config.cwd,
         env: this.config.env,
+        sourceMapOverrides: this.config.sourceMapOverrides,
       });
 
       if (process.env.DEBUG_DAP) {
@@ -435,6 +439,8 @@ export class DebugSession {
         line: frame.line ?? null,
         column: frame.column ?? null,
         module: frame.source?.name,
+        sourceReference: frame.source?.sourceReference,
+        sourceName: frame.source?.name,
       }));
 
       const topFrame = stackResponse.stackFrames[0];
@@ -444,6 +450,8 @@ export class DebugSession {
         column: topFrame?.column,
         function: topFrame?.name,
         module: topFrame?.source?.name,
+        sourceReference: topFrame?.source?.sourceReference,
+        sourceName: topFrame?.source?.name,
       };
 
       // Get locals if requested

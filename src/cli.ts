@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { createRequire } from 'node:module';
 import { Command, Option } from 'commander';
 import { getAdapter, getAdapterNames } from './adapters/index.js';
@@ -24,6 +25,8 @@ const require = createRequire(import.meta.url);
 const packageJson = require('../package.json');
 const VERSION = packageJson.version;
 import { validateAllBreakpoints } from './session/breakpoints.js';
+import { parseSourceMapOverrides, getPresetNames } from './sourcemaps/overrides.js';
+import { diagnoseSourceMaps, formatDiagnoseReport } from './sourcemaps/diagnose.js';
 
 export interface CliOptions {
   adapter: string;
@@ -65,6 +68,8 @@ export interface CliOptions {
   // Compact output mode
   compact?: boolean;
   stackLimit?: number;
+  // Source map options
+  sourceMapOverrides?: string;
 }
 
 export function parseTimeout(value: string): number {
@@ -210,6 +215,11 @@ export function createCli(): Command {
       'Maximum stack frames to include (default: 3 in compact mode, unlimited otherwise)',
       (val: string) => parseInt(val, 10)
     )
+    // Source map options
+    .option(
+      '--source-map-overrides <jsonOrPreset>',
+      'Source map path overrides for TypeScript/bundled code. Use preset names (webpack, vite, esbuild) or JSON object'
+    )
     .action(
       async (
         programPath: string | undefined,
@@ -229,6 +239,7 @@ export function createCli(): Command {
           exceptionChainDepth?: number;
           compact?: boolean;
           stackLimit?: number;
+          sourceMapOverrides?: string;
         }
       ) => {
         // Handle test runner mode
@@ -311,6 +322,63 @@ export function createCli(): Command {
     .action(
       async (options: { claude?: boolean; copilot?: boolean; project?: boolean; dir?: string }) => {
         await installSkill(options);
+      }
+    );
+
+  // Add diagnose-sources subcommand (Phase 3)
+  program
+    .command('diagnose-sources [directory]')
+    .description('Scan directory for source maps and diagnose path resolution issues')
+    .option(
+      '--source-map-overrides <jsonOrPreset>',
+      'Source map path overrides (preset name or JSON object)'
+    )
+    .option('--include-node-modules', 'Include node_modules in scan', false)
+    .option('--verbose', 'Show detailed per-file diagnostics', false)
+    .option('--json', 'Output as JSON instead of human-readable format', false)
+    .action(
+      async (
+        directory: string | undefined,
+        options: {
+          sourceMapOverrides?: string;
+          includeNodeModules?: boolean;
+          verbose?: boolean;
+          json?: boolean;
+        }
+      ) => {
+        const targetDir = directory ? path.resolve(directory) : process.cwd();
+
+        if (!fs.existsSync(targetDir)) {
+          console.error(`Error: Directory not found: ${targetDir}`);
+          process.exit(1);
+        }
+
+        let sourceMapOverrides: Record<string, string> | undefined;
+        if (options.sourceMapOverrides) {
+          try {
+            sourceMapOverrides = parseSourceMapOverrides(options.sourceMapOverrides, targetDir);
+          } catch (error) {
+            console.error(`Error: ${error instanceof Error ? error.message : error}`);
+            console.error(`Available presets: ${getPresetNames().join(', ')}`);
+            process.exit(1);
+          }
+        }
+
+        const result = diagnoseSourceMaps(targetDir, {
+          sourceMapOverrides,
+          includeNodeModules: options.includeNodeModules,
+          verbose: options.verbose,
+        });
+
+        if (options.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          console.log(formatDiagnoseReport(result, options.verbose || false));
+        }
+
+        if (result.summary.sourcesMissing > 0) {
+          process.exit(1);
+        }
       }
     );
 
@@ -444,6 +512,21 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
   // Parse timeout
   const timeout = parseTimeout(options.timeout || '60s');
 
+  // Parse source map overrides
+  let sourceMapOverrides: Record<string, string> | undefined;
+  if (options.sourceMapOverrides) {
+    const workspaceFolder = options.cwd || process.cwd();
+    try {
+      sourceMapOverrides = parseSourceMapOverrides(options.sourceMapOverrides, workspaceFolder);
+    } catch (error) {
+      console.error(
+        `Error: ${error instanceof Error ? error.message : error}`
+      );
+      console.error(`Available presets: ${getPresetNames().join(', ')}`);
+      process.exit(1);
+    }
+  }
+
   // Create output stream (file or stdout)
   let outputStream: NodeJS.WritableStream = process.stdout;
   let fileStream: fs.WriteStream | undefined;
@@ -495,6 +578,8 @@ async function runDebugSession(options: CliOptions & { env?: string[] }): Promis
       // Exception handling options
       flattenExceptions: options.flattenExceptions,
       exceptionChainDepth: options.exceptionChainDepth,
+      // Source map options
+      sourceMapOverrides,
     },
     formatter
   );

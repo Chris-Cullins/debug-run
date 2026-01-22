@@ -27,6 +27,8 @@ import type {
   StepInArguments,
   StepOutArguments,
   Capabilities,
+  SourceArguments,
+  SourceResponse,
 } from './protocol.js';
 
 export interface IDapClient extends EventEmitter {
@@ -51,4 +53,6 @@ export interface IDapClient extends EventEmitter {
   terminate(): Promise<void>;
   getCapabilities(): Capabilities;
   isConnected(): boolean;
+  /** Retrieve source content for virtual/generated sources (Phase 4) */
+  source(args: SourceArguments): Promise<SourceResponse>;
 }

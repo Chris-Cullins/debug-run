@@ -37,6 +37,8 @@ import type {
   OutputEventBody,
   BreakpointEventBody,
   Event,
+  SourceArguments,
+  SourceResponse,
 } from './protocol.js';
 
 export interface SocketDapClientOptions {
@@ -428,6 +430,14 @@ export class SocketDapClient extends EventEmitter {
     } catch {
       // Ignore errors during terminate
     }
+  }
+
+  /**
+   * Retrieve source content for virtual/generated sources (Phase 4)
+   */
+  async source(args: SourceArguments): Promise<SourceResponse> {
+    this.ensureInitialized();
+    return await this.getActiveTransport().sendRequest<SourceResponse>('source', args);
   }
 
   /**

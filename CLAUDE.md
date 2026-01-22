@@ -803,6 +803,81 @@ This location:
 - Is user-specific (no root/admin permissions needed)
 - Can be overridden with `DEBUG_RUN_HOME` environment variable
 
+## Source Map Path Overrides
+
+When debugging TypeScript or bundled code, breakpoints may fail to bind if source maps aren't configured correctly. Use `--source-map-overrides` to fix path resolution:
+
+### Using Presets
+
+```bash
+# For webpack-bundled apps
+npx debug-run ./dist/bundle.js -a node \
+  -b "src/handler.ts:45" \
+  --source-map-overrides webpack \
+  --pretty
+
+# For vite-bundled apps
+npx debug-run ./dist/index.js -a node \
+  -b "src/main.ts:10" \
+  --source-map-overrides vite \
+  --pretty
+```
+
+### Using Custom JSON
+
+```bash
+npx debug-run ./dist/bundle.js -a node \
+  -b "src/handler.ts:45" \
+  --source-map-overrides '{"webpack:///./*": "${workspaceFolder}/*"}' \
+  --pretty
+```
+
+### Available Presets
+
+| Preset | Description |
+|--------|-------------|
+| `webpack` | Handles `webpack:///` paths with common patterns |
+| `vite` | Handles `/@fs/` paths for Vite builds |
+| `esbuild` | Handles `file://` paths for esbuild |
+
+## Source Map Diagnostics
+
+Diagnose source map issues with the `diagnose-sources` command:
+
+```bash
+# Scan current directory for .map files
+npx debug-run diagnose-sources
+
+# Scan specific directory with verbose output
+npx debug-run diagnose-sources ./dist --verbose
+
+# Output as JSON for programmatic use
+npx debug-run diagnose-sources ./dist --json
+
+# Test with custom overrides
+npx debug-run diagnose-sources ./dist --source-map-overrides webpack
+```
+
+### Example Output
+
+```
+Source Map Diagnostic Report
+========================================
+
+Summary:
+  Maps scanned:        3
+  Maps valid:          3
+  Maps invalid:        0
+  Total sources:       15
+  Sources resolved:    12
+  Sources missing:     3
+  Sources w/ content:  0
+
+Top Issues:
+  - Source not found: webpack:///./src/utils.ts (2x)
+  - Source not found: webpack:///./src/config.ts (1x)
+```
+
 ## Token Efficiency (LLM Optimization)
 
 debug-run is optimized for consumption by LLMs. Several features reduce token usage without sacrificing debugging utility:

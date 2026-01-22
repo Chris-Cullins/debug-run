@@ -12,6 +12,8 @@ export interface LaunchOptions {
   cwd?: string;
   env?: Record<string, string>;
   stopAtEntry?: boolean;
+  /** Source map path overrides for js-debug (TypeScript/bundled code) */
+  sourceMapOverrides?: Record<string, string>;
 }
 
 export interface AttachOptions {
