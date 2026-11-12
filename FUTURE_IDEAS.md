@@ -1,258 +1,269 @@
-# Future Ideas for debug-run
+# debug-run roadmap
 
-High-value feature ideas focused on making AI agents more effective debuggers.
+Updated November 12, 2026. Baseline: released version 0.6.0.
 
----
+## Direction
 
-## 1. Intelligent Breakpoint Suggestions
+debug-run gives coding agents reliable access to runtime evidence. The next step
+is to let an agent investigate a live, paused program, preserve what it observes,
+and compare successful and failing executions. The calling agent supplies the
+hypotheses; debug-run supplies execution control and verifiable observations.
 
-**Problem:** AI agents currently guess where to place breakpoints, often requiring multiple debug sessions to zero in on issues.
+This document is the current product roadmap. Older implementation plans under
+`docs/` describe individual features and are historical context, not a second
+backlog. Commands in the planned sections below are illustrative until shipped.
 
-**Solution:** Add a `--suggest-breakpoints` mode that analyzes:
-- Stack traces from exceptions
-- Control flow graphs to find branch points
-- Entry/exit of suspicious functions
-- Lines that modify variables mentioned in error messages
+## What already ships
 
-```bash
-npx debug-run analyze ./app.dll --error "NullReferenceException at Order.Process"
-# Output: Suggested breakpoints with confidence scores
-```
+- Launch and attach through DAP adapters for .NET, Python, Node.js, and LLDB.
+- Line, conditional, hit-count, exception breakpoints, and logpoints.
+- Locals, stack traces, expression evaluation, and recursive variable expansion.
+- Fixed-count stepping and bounded tracing, including stop expressions.
+- Assertions at observed stops and semantic variable changes during tracing.
+- Compact output, filtering, and NDJSON output to stdout or a file.
+- Exception-chain flattening and root-cause classification heuristics.
+- Source-map diagnostics, path overrides, and generated-source support.
+- .NET testhost discovery and attachment, plus installable agent skills.
+- Dependency audits, package smoke tests, supported Node CI, and automatic npm
+  publication when a new version merges into main.
 
-**Why it's valuable:** Reduces debugging iterations from 5-10 to 1-2. Directly addresses the core inefficiency in agent debugging workflows.
+Assertions and variable diffing are shipped features, not future milestones.
+Exception-chain classification does not reconstruct the history of mutations.
+Writing NDJSON to a file records observations, not a replayable process.
 
----
+## Delivery order
 
-## 2. Diff-Aware Debugging
+Order reflects usefulness to agents and dependencies between features. Each row
+is a reviewable feature area; larger areas should be split into complete vertical
+slices. Feature PRs need not bump the package version: prepare a release separately
+once a coherent set of changes is ready, since main publishes new versions.
 
-**Problem:** When debugging a regression, agents don't know which code paths changed between working and broken versions.
+| Order | Work | Useful result | Relative scope |
+| --- | --- | --- | --- |
+| 1 | Persistent sessions and explicit session outcomes | Inspect unexpected state and choose the next action without rerunning | Large; ship a bounded single-process core first |
+| 2 | Doctor and breakpoint explanations | Separate setup failures from application behavior | Medium; reuse existing diagnostics |
+| 3 | Reusable debug recipes | Reproduce an investigation with one command | Medium |
+| 4 | Changed-code breakpoints and evidence-based suggestions | Narrow the investigation using git changes and stack traces | Medium |
+| 5 | Captured-session artifacts and comparisons | Identify meaningful differences between good and bad runs | Large; capture format before comparison |
+| 6 | Bounded failure capture | Retain observations leading up to a failure | Medium, after artifact support |
+| 7 | Repeat until failure | Investigate flaky tests with bounded repeated runs | Medium, after recipes and artifacts |
+| 8 | Data watchpoints | Stop when a supported debugger observes a value being written | Medium to large; adapter-dependent |
 
-**Solution:** Integrate with git to automatically set breakpoints on recently changed lines:
+## 1. Persistent sessions and explicit outcomes
 
-```bash
-npx debug-run ./app.dll -a vsdbg \
-  --break-on-changes HEAD~5 \
-  --filter "src/**/*.cs"
-```
+### Problem
 
-**Why it's valuable:** Most bugs are in recently changed code. This leverages information agents already have (git history) to dramatically narrow the search space.
+The batch CLI generally captures a stop and resumes automatically. Expressions
+must be selected before the run. An agent that discovers an unexpected object
+cannot ask a follow-up question while that execution remains paused.
 
----
+### First useful slice
 
-## 3. Memory Snapshot & Heap Analysis
-
-**Problem:** Memory leaks and large object graphs are invisible to current variable inspection. Agents can't diagnose "why is this service using 2GB of RAM?"
-
-**Solution:** Add memory inspection commands:
-
-```bash
-npx debug-run ./app.dll -a vsdbg \
-  -b "Program.cs:100" \
-  --heap-snapshot \
-  --top-objects 20
-```
-
-Events would include:
-- `heap_snapshot` - Object type distribution, retained sizes
-- Large object detection
-- Potential leak indicators (growing collections, circular references)
-
-**Why it's valuable:** Memory issues are notoriously hard to debug. This gives agents visibility into a dimension they currently can't see at all.
-
----
-
-## 4. Continuous Watch Mode
-
-**Problem:** Current debugging is synchronous - run once, get results, session ends. For intermittent bugs or long-running services, this is inefficient.
-
-**Solution:** Add a watch mode that keeps the session alive and streams events:
+Start a session, return its identifier, and keep it available across CLI calls:
 
 ```bash
-npx debug-run ./app.dll -a vsdbg \
-  -b "Program.cs:67" \
-  --watch \
-  --emit-interval 100  # Emit every 100 hits as batch
+debug-run start ./app.js -a node -b src/orders.ts:84
+debug-run status <session-id>
+debug-run inspect <session-id> --expr order
+debug-run step <session-id> --into
+debug-run continue <session-id>
+debug-run stop <session-id>
 ```
 
-Features:
-- Aggregate statistics over time
-- Pattern detection (e.g., "this breakpoint only hits when X > 100")
-- Export to file for later analysis
+Provide stack selection, locals, expression evaluation, step over/into/out,
+pause, continue, and explicit cleanup. Keep existing batch behavior intact.
+Start with one target per session. Additional targets, .NET test-runner startup,
+and an MCP interface can follow the same controls rather than defining separate
+session semantics.
 
-**Why it's valuable:** Enables debugging of race conditions, intermittent failures, and performance patterns that only emerge over time.
+### Acceptance criteria
 
----
+- Breakpoints and exceptions remain paused until an explicit command resumes.
+- Responses identify the session, state, and stop generation. Reject stale frame
+  and variable references after a resume; do not silently inspect a different stop.
+- Serialize commands and account for events arriving during an in-flight request.
+- Report startup failure, running, paused, normal exit, timeout, adapter failure,
+  and explicit cancellation as distinguishable outcomes.
+- Give sessions a finite lifetime; provide deterministic cleanup and useful errors
+  for dead sessions. Disconnecting an attached target must leave it running.
+- Keep local control endpoints private and authenticated. Do not expose debugger
+  control or captured values through an unauthenticated network service.
+- Bound request size, response size, variable expansion, and request duration.
+- Verify the actual multi-command workflow with an adapter, alongside tests of
+  stale references, command races, timeout, and cleanup.
 
-## 5. Causal Chain Reconstruction
+## 2. Doctor and breakpoint explanations
 
-**Problem:** Agents see *where* an exception happened but not *why*. The root cause is often far upstream from the crash site.
-
-**Solution:** When an exception occurs, automatically trace backwards:
+Build on adapter detection, `diagnose-sources`, and existing breakpoint messages.
 
 ```bash
-npx debug-run ./app.dll -a vsdbg \
-  --break-on-exception all \
-  --trace-cause \
-  --cause-depth 10
+debug-run doctor ./dist/app.js -a node --json
 ```
 
-The `exception_thrown` event would include:
-- `causalChain`: Array of relevant state changes leading to the error
-- Variable values at each point where corrupted data was touched
-- "Last known good" state vs "first bad" state
+Report adapter executable/version when available, target/runtime availability,
+source maps or symbols that can be checked, path mappings, and advertised DAP
+capabilities. Distinguish static checks from checks requiring an adapter session;
+a detected executable alone is not proof that debugging works.
 
-**Why it's valuable:** This is the actual debugging work - understanding causality. Current tools show symptoms; this shows disease.
+For each breakpoint, distinguish invalid request, unverified binding, verified
+but never reached, and reached. Record requested versus resolved source locations
+and provide the adapter's actual diagnostic alongside specific corrective steps.
+Do not label an unreached breakpoint as a setup failure without evidence.
 
----
+Use stable JSON error codes and remediation fields. A failed expression and a
+false assertion are different outcomes. Make exit status useful for automation
+without treating every expected debuggee exception as an infrastructure failure.
 
-## 6. Multi-Process Debugging
+## 3. Reusable debug recipes
 
-**Problem:** Modern apps are distributed - microservices, worker processes, etc. Current tool debugs one process at a time.
-
-**Solution:** Coordinate debugging across processes:
+Store a named launch/attach configuration, breakpoints, selected expressions,
+assertions, and capture limits in a project file.
 
 ```bash
-npx debug-run --multi \
-  --process "api:5000" -b "Api/Controllers/OrderController.cs:42" \
-  --process "worker:5001" -b "Worker/OrderProcessor.cs:15" \
-  --correlate "orderId"
+debug-run run --recipe order-total
 ```
 
-Events would include:
-- Cross-process correlation (follow orderId through the system)
-- Distributed trace visualization
-- Race condition detection between processes
+Resolve paths relative to the recipe file, support explicit CLI overrides, and
+validate the complete configuration before launching. Reference environment
+variables by name instead of saving credentials. Make build/setup commands
+explicit and opt-in; loading a recipe must not execute arbitrary setup steps.
 
-**Why it's valuable:** Aligns with how real applications work. Single-process debugging is increasingly insufficient.
+Record the effective recipe and source revision with each run. Report dirty
+working trees and external inputs that prevent an exact reproduction. Extend
+existing .NET test support first; add Node/Python test-runner integration through
+small adapters rather than assuming all runners start a single process.
 
----
-
-## 7. Assertion-Based Debugging
-
-**Problem:** Agents often know what *should* be true but have to manually check with expressions. Repeated boilerplate.
-
-**Solution:** Add invariant assertions that automatically halt when violated:
+## 4. Changed-code breakpoints and suggestions
 
 ```bash
-npx debug-run ./app.dll -a vsdbg \
-  --assert "order.Total >= 0" \
-  --assert "inventory.Count <= maxInventory" \
-  --assert-scope "OrderService.*"
+debug-run start ./dist/app.js -a node --break-on-changes main --filter 'src/**'
+debug-run suggest --stack-trace failure.txt --changed-since main --json
 ```
 
-Assertions are checked at every step/breakpoint in scope. Violation triggers a detailed event with:
-- Which assertion failed
-- Current vs expected values
-- Stack trace at violation point
+Begin with deterministic evidence: stack-trace locations, changed executable
+lines, and nearby function entry points where the adapter can resolve them.
+Explain every suggestion's origin instead of inventing confidence scores.
 
-**Why it's valuable:** Transforms debugging from "find the bug" to "let the bug find you." Especially powerful for agents that can generate assertions from specifications.
+Handle renames, deleted lines, generated code, source mappings, and changes
+outside executable statements. Use adapter breakpoint-location support where
+available and report unverified fallbacks. Limit candidate count so a large diff
+does not stop on thousands of lines. Show a preview before launching.
 
----
+Full language-specific control-flow or binary analysis is a separate investment,
+not a prerequisite. Measure whether suggestions reduce failed bindings and
+repeated runs on representative debugging tasks before claiming speedups.
 
-## 8. Semantic Variable Diffing
+## 5. Captured-session artifacts and comparisons
 
-**Problem:** When stepping through code, agents see full variable dumps but struggle to spot what *changed*.
-
-**Solution:** Add diff-aware variable reporting:
+Define a versioned artifact format containing observed stops, selected values,
+source identities, recipe, adapter information, outcomes, and capture limits.
+Record truncation and redaction explicitly. Never persist live DAP references as
+though they remain usable after execution resumes.
 
 ```bash
-npx debug-run ./app.dll -a vsdbg \
-  -b "Program.cs:67" \
-  --trace \
-  --diff-vars
+debug-run show good.dbgrun --checkpoint price-calculated
+debug-run compare good.dbgrun bad.dbgrun --checkpoint price-calculated
 ```
 
-Each `trace_step` event includes:
-- `changes`: Only variables that changed since last step
-- `changeType`: "modified", "created", "deleted"
-- Visual diff for complex objects
+Start with offline browsing of captured values, then compare named checkpoints
+and selected object paths. Allow explicit rules for ignoring timestamps,
+generated IDs, and irrelevant ordering. Align by checkpoint, thread, and frame
+identity where possible; do not assume equal step numbers imply equal execution.
 
-**Why it's valuable:** Reduces cognitive load. Instead of comparing 50 variables manually, agents see exactly what moved.
+A useful result identifies the earliest **observed** difference and shows evidence:
+"At price-calculated, discount was 0.10 in run A and 10 in run B. Earlier matched
+checkpoints agreed." It must also report unmatched checkpoints and missing data.
 
----
+This is snapshot inspection, not time-travel execution. Arbitrary new expressions
+or method calls cannot run against an NDJSON history. True replay requires a
+runtime-specific record/replay backend and is deferred.
 
-## 9. Symbolic Execution Hints
+## 6. Bounded failure capture
 
-**Problem:** Agents don't know what inputs would trigger specific code paths.
+Maintain a bounded ring of selected observations and flush it when an assertion
+fails, a chosen exception occurs, or a trigger expression matches. Configure
+limits by events/bytes and total duration, with an optional small post-trigger
+window. Report dropped observations and sampling policy.
 
-**Solution:** Integrate lightweight symbolic analysis:
+Include recent variable changes, stack information, relevant program output,
+source revision, and the reproduction recipe. Scrub configured sensitive fields
+before persistence. A long-running watch mode can aggregate hit counts and
+selected values rather than emitting full objects on every hit.
+
+The first version records only what configured breakpoints/steps observe. It must
+not claim to identify an unobserved write or prove causality. Breakpoints can
+change timing; capture under a debugger is not transparent production tracing.
+
+## 7. Repeat until failure
 
 ```bash
-npx debug-run analyze ./app.dll \
-  --reach "Program.cs:150" \
-  --from "Program.cs:100"
+debug-run repeat --recipe checkout-test --runs 50 --stop-on assertion_failed
 ```
 
-Output:
-- Constraints that must be true to reach target line
-- Example input values that satisfy constraints
-- Branch coverage report
+Require a run limit and total time budget. Save matching failure artifacts and a
+summary of completed, failed, timed-out, and interrupted runs. Group failures by
+stable signatures while preserving their underlying evidence.
 
-**Why it's valuable:** Helps agents construct test cases that exercise specific code paths. Turns "how do I hit this branch?" from guesswork into computation.
+Each run gets fresh session state. Make reset/setup policy explicit, propagate
+cancellation, and avoid overlapping target processes. Repetition is opt-in
+because target execution can have side effects. Report a failed reproduction as
+"not observed in N runs," not proof that a bug is fixed.
 
----
+## 8. Data watchpoints
 
-## 10. Debug Session Recording & Replay
+Expose `dataBreakpointInfo` and `setDataBreakpoints` when the active adapter
+advertises support. Let the agent select an in-scope value and stop on supported
+read/write access, subject to debugger limits.
 
-**Problem:** Debugging is expensive. Re-running to verify a fix requires re-executing the entire session.
+Distinguish native data breakpoints from a fallback that compares expressions at
+selected stops. The latter can miss intermediate mutations and cannot reliably
+identify the writing instruction. Respect reference lifetimes and report why a
+particular value cannot be watched.
 
-**Solution:** Record debug sessions for replay:
+## Improvements to carry alongside the roadmap
 
-```bash
-# Record
-npx debug-run ./app.dll -a vsdbg \
-  -b "Program.cs:67" \
-  --record session.dbgrec
+- Scope variable-diff history to thread and frame, and distinguish nested changes
+  from whole-object replacement. Report limits rather than implying a complete
+  object was captured.
+- Extend assertions with explicit scope/checkpoint selection. Distinguish false,
+  unavailable, and evaluation error; do not equate all three with a violated rule.
+- Support changing breakpoints during a paused session after the control core is
+  stable, with the same validation and binding diagnostics as initial breakpoints.
+- Publish a versioned machine-readable contract for commands, events, errors,
+  capabilities, and stop identifiers. Preserve the simple batch CLI.
+- Maintain small real-adapter smoke tests and benchmark representative agent
+  workflows: time to first useful stop, failed bindings, repeated runs, bytes
+  emitted, and cleanup reliability. Avoid unmeasured efficiency claims.
 
-# Replay (no actual execution)
-npx debug-run replay session.dbgrec \
-  --at-step 42 \
-  -e "newExpression"
-```
+## Deferred work
 
-Features:
-- Time-travel debugging (jump to any recorded state)
-- Add new expressions to historical state
-- Compare two sessions side-by-side
+- **Causal reconstruction:** build on recorded evidence and watchpoints. Separate
+  observed mutation history from inferred explanations; exception chains alone
+  are not a history of how bad state was introduced.
+- **True recording/time travel:** integrate a suitable backend per runtime or OS.
+  It is not a generic DAP feature that an event log can implement.
+- **Heap analysis:** start with a runtime-specific integration only after a clear
+  use case. Retained sizes and memory ownership need runtime tooling; circular
+  references alone do not establish a leak.
+- **Multiprocess/distributed debugging:** add explicit target ownership and event
+  correlation after single-process sessions are reliable. Correlation IDs can
+  join observations but do not automatically detect races or establish causality.
+- **Symbolic execution:** defer language-specific solvers and path constraints;
+  focus first on executing and inspecting concrete reproductions.
 
-**Why it's valuable:** Amortizes the cost of debugging. One execution, unlimited analysis. Critical for expensive-to-reproduce bugs.
+## Non-goals
 
----
+- A graphical debugger, TUI, or IDE replacement.
+- An embedded model that invents diagnoses or modifies application code.
+- General-purpose test generation, language-server functionality, or a historical
+  bug database. Saving a debug recipe is in scope; generating a test suite is not.
+- Silent execution of project setup hooks, unbounded background debugging, or
+  claims that all adapters support the same optional features.
 
-## Prioritization Matrix
+## Protocol constraints
 
-| Feature | Impact | Complexity | Recommended Phase |
-|---------|--------|------------|-------------------|
-| Semantic Variable Diffing | High | Low | Phase 3 |
-| Intelligent Breakpoint Suggestions | Very High | Medium | Phase 3 |
-| Diff-Aware Debugging | High | Low | Phase 3 |
-| Assertion-Based Debugging | High | Medium | Phase 3 |
-| Continuous Watch Mode | Medium | Medium | Phase 4 |
-| Memory Snapshot | Medium | High | Phase 4 |
-| Causal Chain Reconstruction | Very High | Very High | Phase 5 |
-| Debug Session Recording | High | Very High | Phase 5 |
-| Multi-Process Debugging | Medium | Very High | Phase 5 |
-| Symbolic Execution | Medium | Very High | Future |
-
----
-
-## Non-Goals (Avoiding Feature Bloat)
-
-These are explicitly **not** planned:
-
-- **GUI/TUI interface** - This is a CLI for agents, not humans
-- **IDE plugins** - Use existing IDE debuggers for human debugging
-- **Language server integration** - Out of scope; use existing LSPs
-- **Test generation** - Adjacent problem, different tool
-- **Code fix suggestions** - Let the agent handle code modifications
-- **Historical bug databases** - Interesting but tangential
-
----
-
-## Design Principles
-
-1. **Output-first**: Every feature should produce actionable JSON events
-2. **Composable**: Features work together (e.g., watch + assertions + diff)
-3. **Language-agnostic**: Core features work across all adapters
-4. **Fail gracefully**: Missing capabilities shouldn't break sessions
-5. **Agent-optimized**: Optimize for programmatic consumption, not human readability
+DAP object references are generally valid only for their suspended state; control
+commands and artifacts must respect this boundary. Optional capabilities must be
+negotiated and reported rather than assumed. See the
+[DAP overview](https://microsoft.github.io/debug-adapter-protocol/overview) and
+[data-breakpoint protocol history](https://microsoft.github.io/debug-adapter-protocol/changelog.html).
