@@ -84,6 +84,8 @@ export class DapClient extends EventEmitter {
     this.transport = new DapTransport(this.process, this.options.timeout);
 
     // Forward events
+    this.transport.on('event:continued', () => this.emit('continued'));
+
     this.transport.on('event:stopped', (body: StoppedEventBody) => {
       this.emit('stopped', body);
     });
@@ -351,7 +353,10 @@ export class DapClient extends EventEmitter {
    * @param restart - If true, request the debug adapter to restart the session.
    */
   async disconnect(terminateDebuggee: boolean = true, restart: boolean = false): Promise<void> {
-    if (!this.transport?.isOpen()) return;
+    if (!this.transport?.isOpen()) {
+      this.process?.kill();
+      return;
+    }
 
     try {
       await this.transport.sendRequest('disconnect', {

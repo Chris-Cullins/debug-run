@@ -67,6 +67,8 @@ export interface SessionStartEvent extends BaseEvent {
   cwd?: string;
   /** Process ID (attach mode) */
   pid?: number;
+  /** Local inspector port for port-based attachment */
+  port?: number;
   /** True if attaching to a running process */
   attach?: boolean;
 }
@@ -90,7 +92,8 @@ export interface ProcessLaunchedEvent extends BaseEvent {
 
 export interface ProcessAttachedEvent extends BaseEvent {
   type: 'process_attached';
-  pid: number;
+  pid?: number;
+  port?: number;
 }
 
 export interface ProcessExitedEvent extends BaseEvent {

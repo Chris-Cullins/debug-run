@@ -132,7 +132,8 @@ describe('Node.js Adapter', () => {
 
       expect(config.type).toBe('pwa-node');
       expect(config.request).toBe('attach');
-      expect(config.processId).toBe(12345);
+      expect(config.processId).toBe('12345');
+      expect(config.port).toBeUndefined();
     });
 
     it('uses default port when not specified', () => {
@@ -158,7 +159,7 @@ describe('Node.js Adapter', () => {
 
       const config = nodeAdapter.attachConfig(options);
 
-      expect(config.host).toBe('localhost');
+      expect(config.address).toBe('localhost');
     });
 
     it('uses custom host when provided', () => {
@@ -168,7 +169,7 @@ describe('Node.js Adapter', () => {
 
       const config = nodeAdapter.attachConfig(options);
 
-      expect(config.host).toBe('192.168.1.100');
+      expect(config.address).toBe('192.168.1.100');
     });
   });
 });

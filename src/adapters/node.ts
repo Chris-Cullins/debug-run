@@ -112,9 +112,10 @@ Alternative options:
     name: 'Node.js Attach',
     type: 'pwa-node',
     request: 'attach',
-    processId: options.pid,
-    port: options.port || 9229,
-    host: options.host || 'localhost',
+    // js-debug requires a string PID and no explicit port for process attachment.
+    ...(options.pid
+      ? { processId: String(options.pid) }
+      : { port: options.port || 9229, address: options.host || 'localhost' }),
   }),
 
   exceptionFilters: [

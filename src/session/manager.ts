@@ -32,9 +32,13 @@ import type {
 import { BreakpointManager } from './breakpoints.js';
 import { VariableInspector } from './variables.js';
 import { flattenExceptionChainFromLocals } from './exceptions.js';
+import type { SessionController } from '../live/controller.js';
 
 export interface SessionConfig {
   adapter: AdapterConfig;
+  /** Opt-in live control; batch sessions keep automatic continuation. */
+  control?: SessionController;
+  stopAtEntry?: boolean;
   program?: string;
   args?: string[];
   cwd?: string;
@@ -54,6 +58,8 @@ export interface SessionConfig {
   attach?: boolean;
   /** Process ID to attach to */
   pid?: number;
+  /** Local Node inspector port; mutually exclusive with pid in the live CLI. */
+  attachPort?: number;
   /** Enable trace mode - step through code after breakpoint hit */
   trace?: boolean;
   /** Use stepIn instead of stepOver in trace mode */
@@ -147,8 +153,12 @@ export class DebugSession {
     this.sessionEndEmitted = false;
 
     // Emit session start
-    if (this.config.attach && this.config.pid) {
-      this.formatter.sessionStartAttach(this.config.adapter.name, this.config.pid);
+    if (this.config.attach && (this.config.pid || this.config.attachPort)) {
+      this.formatter.sessionStartAttach(
+        this.config.adapter.name,
+        this.config.pid,
+        this.config.attachPort
+      );
     } else {
       this.formatter.sessionStart(
         this.config.adapter.name,
@@ -190,6 +200,10 @@ export class DebugSession {
         throw this.sessionError;
       }
     } catch (error) {
+      this.config.control?.finish(
+        'startup_error',
+        error instanceof Error ? error.message : String(error)
+      );
       // Only emit error if it wasn't already emitted by endSessionWithError
       if (error !== this.sessionError) {
         this.formatter.error(
@@ -207,7 +221,10 @@ export class DebugSession {
     // Create and connect DAP client
     this.state = 'connecting';
 
-    if (this.config.adapter.transport === 'socket' && this.config.adapter.socketPort) {
+    if (
+      this.config.adapter.transport === 'socket' &&
+      this.config.adapter.socketPort !== undefined
+    ) {
       // Use socket-based client for adapters like js-debug
       this.client = new SocketDapClient({
         command: this.config.adapter.command,
@@ -215,7 +232,9 @@ export class DebugSession {
         cwd: this.config.cwd,
         env: { ...this.config.adapter.env, ...this.config.env },
         port: this.config.adapter.socketPort,
-        timeout: this.config.timeout,
+        host: this.config.control ? '127.0.0.1' : undefined,
+        waitForTarget: Boolean(this.config.control),
+        timeout: this.config.control ? 10000 : this.config.timeout,
       });
     } else {
       // Use stdio-based client (default)
@@ -224,18 +243,21 @@ export class DebugSession {
         args: this.config.adapter.args,
         cwd: this.config.cwd,
         env: { ...this.config.adapter.env, ...this.config.env },
-        timeout: this.config.timeout,
+        timeout: this.config.control ? 10000 : this.config.timeout,
       });
     }
 
+    this.config.control?.bind(this.client, () => this.endSession());
     this.setupEventHandlers();
     await this.client.connect();
+    if (this.sessionEndEmitted) return;
 
     // Initialize DAP session
     this.state = 'initializing';
     await this.client.initialize({
       adapterID: this.config.adapter.id,
     });
+    if (this.sessionEndEmitted) return;
 
     // Create managers
     this.breakpointManager = new BreakpointManager(this.client, this.formatter, {
@@ -271,30 +293,42 @@ export class DebugSession {
       await this.setExceptionBreakpoints();
     }
 
+    if (this.sessionEndEmitted) return;
+
     // Launch or attach
-    if (this.config.attach && this.config.pid) {
+    if (this.config.attach && (this.config.pid || this.config.attachPort)) {
       // Attach to running process
       const attachConfig = this.config.adapter.attachConfig({
         pid: this.config.pid,
+        port: this.config.attachPort,
+        ...(this.config.attachPort ? { host: '127.0.0.1' } : {}),
       });
 
-      await this.client.attach(attachConfig);
-
       if (requiresLaunchFirst) {
-        // Wait for 'initialized' event after attach, then set breakpoints
-        await this.waitForInitialized();
+        // Like launch, debugpy defers its attach response until configurationDone.
+        const initialized = this.waitForInitialized();
+        const attachPromise = this.client.attach(attachConfig);
+        void attachPromise.catch((error: Error) => this.endSessionWithError(error));
+        await initialized;
+        if (this.sessionEndEmitted) return;
         this.state = 'configuring';
         await this.breakpointManager.setAllBreakpoints();
         await this.setExceptionBreakpoints();
+        await this.client.configurationDone();
+        await attachPromise;
+      } else if (this.config.adapter.transport === 'socket') {
+        await this.client.configurationDone();
+        await this.client.attach(attachConfig);
+      } else {
+        await this.client.attach(attachConfig);
+        await this.client.configurationDone();
       }
-
-      // Signal configuration done
-      await this.client.configurationDone();
 
       this.state = 'running';
       this.formatter.emit(
         this.formatter.createEvent('process_attached', {
           pid: this.config.pid,
+          ...(this.config.attachPort ? { port: this.config.attachPort } : {}),
         })
       );
     } else {
@@ -305,6 +339,7 @@ export class DebugSession {
         cwd: this.config.cwd,
         env: this.config.env,
         sourceMapOverrides: this.config.sourceMapOverrides,
+        stopAtEntry: this.config.stopAtEntry,
       });
 
       if (process.env.DEBUG_DAP) {
@@ -324,8 +359,11 @@ export class DebugSession {
         // 3. Set breakpoints (now the server can accept them)
         // 4. Send configurationDone (signals program can start running)
         // 5. Wait for launch response
+        const initialized = this.waitForInitialized();
         const launchPromise = this.client.launch(launchConfig);
-        await this.waitForInitialized();
+        void launchPromise.catch((error: Error) => this.endSessionWithError(error));
+        await initialized;
+        if (this.sessionEndEmitted) return;
         this.state = 'configuring';
         await this.breakpointManager.setAllBreakpoints();
         await this.setExceptionBreakpoints();
@@ -344,6 +382,7 @@ export class DebugSession {
       this.state = 'running';
       this.formatter.emit(this.formatter.createEvent('process_launched', {}));
     }
+    this.config.control?.started();
   }
 
   /**
@@ -351,22 +390,15 @@ export class DebugSession {
    */
   private async waitForInitialized(): Promise<void> {
     return new Promise((resolve) => {
-      // Check if already received (unlikely but possible)
-      const onInitialized = () => {
+      const finish = () => {
+        clearTimeout(timeout);
+        this.client!.removeListener('initialized', finish);
         resolve();
       };
-      this.client!.once('initialized', onInitialized);
-
-      // Timeout after 30 seconds
-      const timeout = setTimeout(() => {
-        this.client!.removeListener('initialized', onInitialized);
-        resolve(); // Continue anyway - some adapters may not send this event
-      }, 30000);
-
-      // Clear timeout if initialized is received
-      this.client!.once('initialized', () => {
-        clearTimeout(timeout);
-      });
+      // Cancel this wait during cleanup so startup cannot configure a closed adapter.
+      const timeout = setTimeout(finish, 30000);
+      this.client!.once('initialized', finish);
+      void this.sessionPromise?.then(finish);
     });
   }
 
@@ -405,8 +437,13 @@ export class DebugSession {
       this.handleOutput(body);
     });
 
+    this.client.on('continued', () => this.config.control?.continued());
     this.client.on('error', (error: Error) => {
       this.formatter.error('Debug adapter error', error.message);
+      if (this.config.control) {
+        this.config.control.finish('adapter_error', error.message);
+        this.endSessionWithError(error);
+      }
     });
 
     this.client.on('exit', () => {
@@ -415,6 +452,10 @@ export class DebugSession {
   }
 
   private async handleStopped(body: StoppedEventBody): Promise<void> {
+    if (this.config.control) {
+      await this.config.control.stopped(body);
+      return;
+    }
     this.state = 'stopped';
     const threadId = body.threadId ?? 1;
     const reason = body.reason;
@@ -754,6 +795,7 @@ export class DebugSession {
 
   private handleExited(body: ExitedEventBody): void {
     this.exitCode = body.exitCode;
+    this.config.control?.finish('exited', undefined, body.exitCode);
     this.formatter.emit(
       this.formatter.createEvent('process_exited', {
         exitCode: body.exitCode,
@@ -763,6 +805,11 @@ export class DebugSession {
   }
 
   private handleTerminated(): void {
+    this.config.control?.finish(
+      this.exitCode === null ? 'terminated' : 'exited',
+      undefined,
+      this.exitCode ?? undefined
+    );
     this.state = 'terminated';
     this.endSession();
   }
@@ -774,6 +821,7 @@ export class DebugSession {
   }
 
   private handleAdapterExit(): void {
+    this.config.control?.finish('adapter_error', 'The debug adapter disconnected unexpectedly.');
     if (this.state !== 'terminated') {
       this.state = 'terminated';
       this.endSession();
@@ -781,6 +829,7 @@ export class DebugSession {
   }
 
   private handleTimeout(): void {
+    this.config.control?.finish('timeout', `Session timed out after ${this.config.timeout}ms`);
     this.formatter.error('Session timed out', `Timeout after ${this.config.timeout}ms`);
     this.endSessionWithError(new Error(`Session timed out after ${this.config.timeout}ms`));
   }
@@ -838,7 +887,7 @@ export class DebugSession {
 
     // Disconnect client
     // In attach mode, don't terminate the debuggee - leave the process running
-    if (this.client?.isConnected()) {
+    if (this.client && (this.config.control || this.client.isConnected())) {
       try {
         const terminateDebuggee = !this.config.attach;
         await this.client.disconnect(terminateDebuggee);

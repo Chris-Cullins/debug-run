@@ -449,11 +449,12 @@ export class OutputFormatter {
   /**
    * Emit a session_start event (attach mode)
    */
-  sessionStartAttach(adapter: string, pid: number): void {
+  sessionStartAttach(adapter: string, pid?: number, port?: number): void {
     this.emit(
       this.createEvent('session_start', {
         adapter,
         pid,
+        ...(port ? { port } : {}),
         attach: true,
       })
     );

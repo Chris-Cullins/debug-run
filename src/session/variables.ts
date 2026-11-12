@@ -89,6 +89,8 @@ export interface VariableInspectorOptions {
   maxDepth?: number;
   /** Maximum number of items to fetch from collections (default: 20) */
   maxCollectionItems?: number;
+  /** Hard expansion budget; also enforces response item limits when adapters ignore count. */
+  maxVariables?: number;
   /** Timeout for variable fetching in ms (default: 5000) */
   timeout?: number;
   /**
@@ -116,6 +118,8 @@ export interface VariableInspectorOptions {
 }
 
 export class VariableInspector {
+  public truncated = false;
+  private expandedVariables = 0;
   private client: IDapClient;
   private options: Required<VariableInspectorOptions>;
 
@@ -124,12 +128,23 @@ export class VariableInspector {
     this.options = {
       maxDepth: options.maxDepth ?? 2,
       maxCollectionItems: options.maxCollectionItems ?? 20,
+      maxVariables: options.maxVariables ?? Infinity,
       timeout: options.timeout ?? 5000,
       deduplicateByContent: options.deduplicateByContent ?? true,
       compactServices: options.compactServices ?? true,
       omitNullProperties: options.omitNullProperties ?? true,
       captureClosures: options.captureClosures ?? false,
     };
+  }
+
+  private boundVariables(variables: DapVariable[]): DapVariable[] {
+    if (!Number.isFinite(this.options.maxVariables)) return variables;
+    const limit = Math.min(
+      this.options.maxCollectionItems,
+      Math.max(0, this.options.maxVariables - this.expandedVariables)
+    );
+    if (variables.length > limit) this.truncated = true;
+    return variables.slice(0, limit);
   }
 
   /**
@@ -148,7 +163,15 @@ export class VariableInspector {
       // Track whether we found a primary locals scope (to conditionally include block/closure)
       let foundPrimaryLocals = false;
 
-      for (const scope of scopesResponse.scopes) {
+      const scopes = Number.isFinite(this.options.maxVariables)
+        ? scopesResponse.scopes.slice(0, this.options.maxCollectionItems)
+        : scopesResponse.scopes;
+      if (scopes.length < scopesResponse.scopes.length) this.truncated = true;
+      for (const scope of scopes) {
+        if (this.expandedVariables >= this.options.maxVariables) {
+          this.truncated = true;
+          break;
+        }
         // Categorize scope by name
         // Different adapters use different naming conventions:
         // - netcoredbg/vsdbg: "Locals", "Arguments"
@@ -185,7 +208,7 @@ export class VariableInspector {
           count: this.options.maxCollectionItems,
         });
 
-        for (const v of vars.variables) {
+        for (const v of this.boundVariables(vars.variables)) {
           // Handle name collisions across scopes
           // If name already exists with different value, suffix with scope name
           let varName = v.name;
@@ -239,6 +262,10 @@ export class VariableInspector {
     contentHashes: Map<string, string> = new Map(),
     currentPath: string = ''
   ): Promise<VariableValue> {
+    if (this.expandedVariables++ >= this.options.maxVariables) {
+      this.truncated = true;
+      return { type: v.type || 'unknown', value: '[inspection limit reached]', expandable: false };
+    }
     const variable: VariableValue = {
       type: v.type || 'unknown',
       value: this.parseValue(v.value, v.type),
@@ -281,7 +308,7 @@ export class VariableInspector {
         });
 
         // Filter out blocked properties
-        let filteredChildren = children.variables.filter(
+        let filteredChildren = this.boundVariables(children.variables).filter(
           (child) => !this.isBlockedProperty(child.name)
         );
 
