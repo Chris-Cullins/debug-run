@@ -1,6 +1,6 @@
 # debug-run roadmap
 
-Updated November 12, 2026. Baseline: released version 0.6.0.
+Updated November 12, 2026. Released baseline: 0.6.0. Development status below includes unreleased work.
 
 ## Direction
 
@@ -31,6 +31,18 @@ Assertions and variable diffing are shipped features, not future milestones.
 Exception-chain classification does not reconstruct the history of mutations.
 Writing NDJSON to a file records observations, not a replayable process.
 
+## Unreleased development progress
+
+Persistent single-target sessions are implemented on main (PR #20): separate CLI calls
+can inspect and control a paused target, with bounded lifetimes and explicit outcomes.
+Node launch/attach has real-adapter integration coverage; other adapter lifecycles have
+mocked tests. Multi-target control and an MCP interface remain follow-up work.
+
+Development source now includes `doctor` preflight/optional handshake diagnostics and
+breakpoint binding/hit reports. It deliberately does not claim to verify target runtime
+compatibility, PDB identity, every loaded source map, or whether an unobserved breakpoint
+is unreachable. See [diagnostics](docs/diagnostics.md) for the implemented checks.
+
 ## Delivery order
 
 Order reflects usefulness to agents and dependencies between features. Each row
@@ -57,7 +69,7 @@ The batch CLI generally captures a stop and resumes automatically. Expressions
 must be selected before the run. An agent that discovers an unexpected object
 cannot ask a follow-up question while that execution remains paused.
 
-### First useful slice
+### Implemented first slice (unreleased)
 
 Start a session, return its identifier, and keep it available across CLI calls:
 
@@ -76,7 +88,7 @@ Start with one target per session. Additional targets, .NET test-runner startup,
 and an MCP interface can follow the same controls rather than defining separate
 session semantics.
 
-### Acceptance criteria
+### Contract of the implemented slice
 
 - Breakpoints and exceptions remain paused until an explicit command resumes.
 - Responses identify the session, state, and stop generation. Reject stale frame

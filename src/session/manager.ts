@@ -247,7 +247,11 @@ export class DebugSession {
       });
     }
 
-    this.config.control?.bind(this.client, () => this.endSession());
+    this.config.control?.bind(
+      this.client,
+      () => this.endSession(),
+      () => this.breakpointManager?.getReport() ?? []
+    );
     this.setupEventHandlers();
     await this.client.connect();
     if (this.sessionEndEmitted) return;
@@ -437,6 +441,11 @@ export class DebugSession {
       this.handleOutput(body);
     });
 
+    this.client.on('breakpoint', (event) => this.breakpointManager?.updateBinding(event));
+    this.client.on('breakpointBindings', ({ file, breakpoints }) =>
+      this.breakpointManager?.applyBindings(file, breakpoints)
+    );
+
     this.client.on('continued', () => this.config.control?.continued());
     this.client.on('error', (error: Error) => {
       this.formatter.error('Debug adapter error', error.message);
@@ -452,7 +461,11 @@ export class DebugSession {
   }
 
   private async handleStopped(body: StoppedEventBody): Promise<void> {
+    this.breakpointManager?.recordHits(body.hitBreakpointIds);
     if (this.config.control) {
+      if (body.reason === 'breakpoint') this.breakpointsHit++;
+      if (body.reason === 'exception') this.exceptionsCaught++;
+      if (body.reason === 'step') this.stepsExecuted++;
       await this.config.control.stopped(body);
       return;
     }
@@ -847,6 +860,7 @@ export class DebugSession {
         breakpointsHit: this.breakpointsHit,
         exceptionsCaught: this.exceptionsCaught,
         stepsExecuted: this.stepsExecuted,
+        breakpoints: this.breakpointManager?.getReport(),
       });
     }
 
@@ -868,6 +882,7 @@ export class DebugSession {
         breakpointsHit: this.breakpointsHit,
         exceptionsCaught: this.exceptionsCaught,
         stepsExecuted: this.stepsExecuted,
+        breakpoints: this.breakpointManager?.getReport(),
       });
     }
 

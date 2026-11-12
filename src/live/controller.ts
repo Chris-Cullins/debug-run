@@ -1,5 +1,6 @@
 import type { IDapClient } from '../dap/client-interface.js';
 import type { StoppedEventBody, StackFrame } from '../dap/protocol.js';
+import type { BreakpointReport } from '../output/events.js';
 import { VariableInspector } from '../session/variables.js';
 
 export class ControlError extends Error {
@@ -24,6 +25,7 @@ export interface LiveCommand {
 }
 
 export interface LiveStatus {
+  breakpoints?: BreakpointReport[];
   state: 'starting' | 'running' | 'paused' | 'ended' | 'failed';
   stop?: {
     id: number;
@@ -43,11 +45,13 @@ export interface LiveStatus {
 export class SessionController {
   private client?: IDapClient;
   private end?: () => void;
+  private breakpointReport?: () => BreakpointReport[];
   private generation = 0;
   private status: LiveStatus = { state: 'starting' };
   private queue: Promise<unknown> = Promise.resolve();
 
-  bind(client: IDapClient, end: () => void): void {
+  bind(client: IDapClient, end: () => void, breakpointReport?: () => BreakpointReport[]): void {
+    this.breakpointReport = breakpointReport;
     this.client = client;
     this.end = end;
   }
@@ -76,7 +80,10 @@ export class SessionController {
   }
 
   snapshot(): LiveStatus {
-    return structuredClone(this.status);
+    return structuredClone({
+      ...this.status,
+      ...(this.breakpointReport ? { breakpoints: this.breakpointReport() } : {}),
+    });
   }
 
   private isFinished(): boolean {

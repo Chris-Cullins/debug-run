@@ -150,7 +150,7 @@ function findMapFiles(directory: string, excludeDirs: string[]): string[] {
   return mapFiles;
 }
 
-function analyzeSourceMap(
+export function analyzeSourceMap(
   mapPath: string,
   workspaceRoot: string,
   options: DiagnoseOptions

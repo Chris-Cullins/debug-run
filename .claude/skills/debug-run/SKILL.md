@@ -80,6 +80,26 @@ npx debug-run ./main.py -a python -b "src/processor.py:25" --pretty
 npx debug-run ./dist/index.js -a node -b "src/index.ts:100" --pretty
 ```
 
+## Diagnose Setup (Development Version)
+
+Check `debug-run doctor --help` for availability; npm 0.6.0 does not include it.
+Before rerunning a failed investigation, inspect prerequisites:
+
+```bash
+debug-run doctor ./dist/app.js -a node -b "src/orders.ts:42" --json
+# Optional: start only the adapter and query its capabilities, without running the target.
+debug-run doctor ./dist/app.js -a node --probe --json
+```
+
+Each check has `code`, `status`, `evidence`, `message`, optional `details`, and
+`remediation`. Exit 1 / `ok: false` means at least one failed check. Warnings alone
+exit 0. Successful preflight or handshake does not prove a target will run or bind.
+For live sessions, read `status.result.breakpoints`; batch output includes
+`session_end.summary.breakpoints`. `binding` and `hitStatus` are independent:
+`verified` + `not_observed` is not evidence of a setup failure. A reported hit is
+`observed` even when an adapter still reports a provisional binding. Adapters that
+omit hit IDs and logpoints may execute without producing a recorded hit.
+
 ## Persistent Sessions (Development Version)
 
 Check `debug-run start --help` before using these commands; npm 0.6.0 does not include them.

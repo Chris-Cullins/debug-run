@@ -81,6 +81,7 @@ export interface SessionEndEvent extends BaseEvent {
     breakpointsHit: number;
     exceptionsCaught: number;
     stepsExecuted: number;
+    breakpoints?: BreakpointReport[];
   };
 }
 
@@ -102,12 +103,26 @@ export interface ProcessExitedEvent extends BaseEvent {
   durationMs: number;
 }
 
+export interface BreakpointReport {
+  id?: number;
+  requested: { file: string; line: number };
+  resolved?: { file: string; line: number };
+  binding: 'rejected' | 'unverified' | 'verified';
+  hitStatus: 'observed' | 'not_observed';
+  hits: number;
+  code: string;
+  adapterMessage?: string;
+  suggestions: string[];
+}
+
 // Breakpoint diagnostics for unverified breakpoints
 export interface BreakpointDiagnostics {
   /** The file path as originally requested */
   requestedFile: string;
   /** The line number as originally requested */
   requestedLine: number;
+  resolvedFile?: string;
+  resolvedLine?: number;
   /** Error message from the debug adapter */
   adapterMessage?: string;
   /** Actionable suggestions for fixing the issue */

@@ -114,7 +114,10 @@ Command error (exit status 1):
 CLI usage errors handled by the argument parser can still produce conventional stderr
 output. Valid control commands return one JSON object, rather than the batch NDJSON
 stream. `status` also includes adapter capabilities and a bounded buffer of recent events
-while the worker is alive, with `droppedEvents` reporting discarded events.
+while the worker is alive, with `droppedEvents` reporting discarded events. `breakpoints`
+reports requested/resolved locations, the adapter's latest binding state/message, and
+observed hit counts. These breakpoint reports remain in completed session metadata.
+See [diagnostics](diagnostics.md) for interpreting binding versus hit evidence.
 
 States are `starting`, `running`, `paused`, `ended`, or `failed`. Terminal `outcome` is
 one of `exited`, `terminated`, `stopped`, `timeout`, `adapter_error`, or `startup_error`.

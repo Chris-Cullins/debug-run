@@ -80,7 +80,7 @@ export async function commandExists(command: string): Promise<string | null> {
 
   try {
     const cmd = process.platform === 'win32' ? `where ${command}` : `which ${command}`;
-    const { stdout } = await execAsync(cmd);
+    const { stdout } = await execAsync(cmd, { timeout: 5000, maxBuffer: 65536 });
     return stdout.trim().split('\n')[0] || null;
   } catch {
     return null;
