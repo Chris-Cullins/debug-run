@@ -58,6 +58,8 @@ export interface SocketDapClientOptions {
   timeout?: number;
   /** Delay before connecting (ms) - give server time to start */
   connectDelay?: number;
+  /** Live commands must wait for the child target to finish attaching. */
+  waitForTarget?: boolean;
 }
 
 export class SocketDapClient extends EventEmitter {
@@ -67,6 +69,8 @@ export class SocketDapClient extends EventEmitter {
   private options: SocketDapClientOptions;
   private capabilities: Capabilities = {};
   private initialized: boolean = false;
+  private targetReady = false;
+  private targetError?: Error;
 
   // Store breakpoint configurations for child session
   private breakpointConfigs: SetBreakpointsArguments[] = [];
@@ -214,6 +218,8 @@ export class SocketDapClient extends EventEmitter {
             console.error('[DAP] Child session created successfully');
           }
         } catch (error) {
+          this.targetError = error instanceof Error ? error : new Error(String(error));
+          if (this.options.waitForTarget) this.emit('error', this.targetError);
           if (process.env.DEBUG_DAP) {
             console.error('[DAP] Child session creation failed:', error);
           }
@@ -278,6 +284,7 @@ export class SocketDapClient extends EventEmitter {
   async launch(args: LaunchRequestArguments): Promise<void> {
     this.ensureInitialized();
     await this.transport!.sendRequest('launch', args);
+    if (this.options.waitForTarget) await this.waitForTarget();
   }
 
   /**
@@ -286,6 +293,37 @@ export class SocketDapClient extends EventEmitter {
   async attach(args: AttachRequestArguments): Promise<void> {
     this.ensureInitialized();
     await this.transport!.sendRequest('attach', args);
+    if (this.options.waitForTarget) await this.waitForTarget();
+  }
+
+  private async waitForTarget(): Promise<void> {
+    if (this.targetError) throw this.targetError;
+    if (this.targetReady) return;
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.removeListener('targetReady', ready);
+        this.removeListener('error', failed);
+        this.removeListener('exit', exited);
+      };
+      const ready = () => {
+        cleanup();
+        resolve();
+      };
+      const failed = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      const exited = () =>
+        failed(new Error('Debug adapter disconnected before the target was ready'));
+      const timer = setTimeout(
+        () => failed(new Error('Debug target did not become ready')),
+        this.options.timeout ?? 10000
+      );
+      this.once('targetReady', ready);
+      this.once('error', failed);
+      this.once('exit', exited);
+    });
   }
 
   /**
@@ -515,6 +553,8 @@ export class SocketDapClient extends EventEmitter {
       requestTimeout: this.options.timeout,
     });
 
+    this.childTransport.on('error', (error: Error) => this.emit('error', error));
+    this.childTransport.on('exit', () => this.emit('exit'));
     await this.childTransport.connect();
 
     if (process.env.DEBUG_DAP) {
@@ -645,5 +685,7 @@ export class SocketDapClient extends EventEmitter {
     if (process.env.DEBUG_DAP) {
       console.error('[DAP child] Launch complete');
     }
+    this.targetReady = true;
+    this.emit('targetReady');
   }
 }

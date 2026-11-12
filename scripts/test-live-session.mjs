@@ -216,7 +216,8 @@ try {
     attached.once('error', reject);
   });
   const attach = await start('--attach', '--port', inspectorPort, '--timeout', '15s');
-  await command('pause', attach);
+  const pausedAttach = await command('pause', attach);
+  assert.equal(pausedAttach.ok, true, JSON.stringify(pausedAttach));
   await waitFor(attach, (status) => status.state === 'paused' && status.stop.ready);
   assert.equal(
     (await command('inspect', attach, '--expr', 'process.pid')).result.value.value,

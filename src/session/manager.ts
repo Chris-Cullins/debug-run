@@ -233,6 +233,7 @@ export class DebugSession {
         env: { ...this.config.adapter.env, ...this.config.env },
         port: this.config.adapter.socketPort,
         host: this.config.control ? '127.0.0.1' : undefined,
+        waitForTarget: Boolean(this.config.control),
         timeout: this.config.control ? 10000 : this.config.timeout,
       });
     } else {
