@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm-dependencies:
+        patterns: ['*']
+  - package-ecosystem: npm
+    directory: /samples/typescript
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ['*']
+  - package-ecosystem: nuget
+    directories:
+      - /samples/aspnet/SampleApi
+      - /samples/nunit
+      - /samples/enterprise/src/EnterpriseApi
+      - /samples/enterprise/tests/EnterpriseApi.Tests
+    schedule:
+      interval: weekly
+    ignore:
+      # Review framework, API, and licensing changes separately.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']

@@ -1,6 +1,6 @@
 {
   "name": "debug-run",
-  "version": "0.5.10",
+  "version": "0.6.0",
   "description": "CLI tool enabling AI agents to programmatically debug code via DAP",
   "type": "module",
   "main": "dist/index.cjs",
@@ -15,7 +15,10 @@
     "test:run": "vitest run",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write src/",
-    "format:check": "prettier --check src/"
+    "format:check": "prettier --check src/",
+    "prepack": "npm run build",
+    "check": "npm run typecheck && npm run format:check && npm run test:run",
+    "test:package": "node scripts/test-package.mjs"
   },
   "lint-staged": {
     "src/**/*.{ts,js}": [
@@ -23,27 +26,22 @@
     ]
   },
   "dependencies": {
-    "@vscode/debugprotocol": "^1.65.0",
-    "adm-zip": "^0.5.16",
-    "chalk": "^5.0.0",
-    "commander": "^12.0.0",
-    "glob": "^10.0.0",
-    "tar": "^7.5.4"
+    "adm-zip": "^0.6.1",
+    "commander": "^15.1.0",
+    "tar": "^7.5.23"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.7",
-    "@types/node": "^20.0.0",
-    "bun-types": "^1.0.0",
-    "esbuild": "^0.27.2",
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
-    "prettier": "^3.8.0",
-    "tsx": "^4.21.0",
-    "typescript": "^5.3.0",
-    "vitest": "^4.0.17"
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.22.1"
   },
   "repository": {
     "type": "git",
@@ -58,5 +56,9 @@
     "agent"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "files": [
+    "dist/index.cjs",
+    ".claude/skills/debug-run/*.md"
+  ]
 }

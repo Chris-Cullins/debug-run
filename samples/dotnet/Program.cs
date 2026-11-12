@@ -1,5 +1,5 @@
 // Sample application for testing debug-run
-// Run with: debug-run ./bin/Debug/net9.0/SampleApp.dll -a netcoredbg -b "Program.cs:25"
+// Run with: debug-run ./bin/Debug/net10.0/SampleApp.dll -a netcoredbg -b "Program.cs:25"
 
 // Enterprise-style setup with many reference types
 var config = new AppConfiguration

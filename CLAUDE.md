@@ -50,14 +50,14 @@ dotnet build
 cd ../..
 ```
 
-This creates `samples/dotnet/bin/Debug/net8.0/SampleApp.dll`.
+This creates `samples/dotnet/bin/Debug/net10.0/SampleApp.dll`.
 
 ## Testing with the Sample App
 
 ### Basic Debugging (breakpoint + variable capture)
 
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   --pretty \
@@ -74,7 +74,7 @@ This will:
 Use `--eval` or `-e` to evaluate expressions at each breakpoint:
 
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   -e "order.Total" \
@@ -89,7 +89,7 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
 Use `--assert` to declare invariants that must remain truthy. The debugger halts immediately when any assertion fails, transforming debugging from "search for the bug" to "let the bug announce itself."
 
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   --assert "order.Total >= 0" \
@@ -123,7 +123,7 @@ When `--break-on-exception` is used, exceptions are automatically analyzed to:
 This feature is enabled by default. Use `--no-flatten-exceptions` to disable it.
 
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   --break-on-exception all \
   --pretty \
@@ -386,7 +386,7 @@ Trace mode automatically steps through code after hitting a breakpoint, capturin
 ### Basic Trace
 
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   --trace \
@@ -472,7 +472,7 @@ Control where output goes and filter out events you don't need.
 Write events to a file instead of stdout:
 
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   -o debug-output.json \
@@ -536,7 +536,7 @@ When tracing through code, agents receive full variable snapshots at each step b
 ### Basic Usage
 
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   --trace \

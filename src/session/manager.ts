@@ -84,13 +84,7 @@ export interface SessionConfig {
 }
 
 type SessionState =
-  | 'created'
-  | 'connecting'
-  | 'initializing'
-  | 'configuring'
-  | 'running'
-  | 'stopped'
-  | 'terminated';
+  'created' | 'connecting' | 'initializing' | 'configuring' | 'running' | 'stopped' | 'terminated';
 
 export class DebugSession {
   private config: SessionConfig;
@@ -462,8 +456,7 @@ export class DebugSession {
 
       // Run evaluations if specified (skip for breakpoints when evalAfterStep is enabled)
       let evaluations:
-        | Record<string, { result: string; type?: string; error?: string }>
-        | undefined;
+        Record<string, { result: string; type?: string; error?: string }> | undefined;
       const shouldDeferEval = this.config.evalAfterStep && reason === 'breakpoint';
       if (this.config.evaluations?.length && topFrame && !shouldDeferEval) {
         evaluations = await this.variableInspector!.evaluateExpressions(
@@ -492,8 +485,7 @@ export class DebugSession {
 
         // Now evaluate expressions after the line has executed
         let evaluations:
-          | Record<string, { result: string; type?: string; error?: string }>
-          | undefined;
+          Record<string, { result: string; type?: string; error?: string }> | undefined;
         if (this.config.evaluations?.length && topFrame) {
           evaluations = await this.variableInspector!.evaluateExpressions(
             topFrame.id,

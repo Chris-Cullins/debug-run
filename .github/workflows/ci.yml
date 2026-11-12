@@ -7,70 +7,89 @@ on:
     branches: [main]
 
 permissions:
-  id-token: write # Required for npm trusted publishing (OIDC)
   contents: read
 
 jobs:
   check:
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.22.1', '24', '26']
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24'
+          node-version: ${{ matrix.node }}
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Typecheck, formatting, and tests
+        run: npm run check
 
-      - name: Format check
-        run: npm run format:check
+      - name: Audit dependencies
+        run: npm audit
 
-      - name: Build
-        run: npm run build
+      - name: Verify npm package
+        run: npm run test:package
+
+      - name: Check TypeScript sample
+        run: |
+          npm ci --prefix samples/typescript
+          npm audit --prefix samples/typescript
+          npm run build --prefix samples/typescript
+
+  samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build and audit .NET samples
+        shell: bash
+        run: |
+          for project in samples/dotnet/SampleApp.csproj samples/aspnet/SampleApi/SampleApi.csproj samples/nunit/SampleTests.csproj samples/enterprise/tests/EnterpriseApi.Tests/EnterpriseApi.Tests.csproj; do
+            dotnet restore "$project" -p:NuGetAuditMode=all -p:NuGetAuditLevel=low -warnaserror:NU1900,NU1901,NU1902,NU1903,NU1904
+            dotnet build "$project" --no-restore
+          done
 
   publish:
-    needs: check
+    needs: [check, samples]
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: npm-publish
+      cancel-in-progress: false
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-
-      - name: Get package version
-        id: package
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+          package-manager-cache: false
 
       - name: Check if version exists on npm
         id: check
-        run: |
-          PACKAGE_NAME=$(node -p "require('./package.json').name")
-          PUBLISHED=$(npm view "$PACKAGE_NAME@${{ steps.package.outputs.version }}" version 2>/dev/null || echo "not-found")
-          if [ "$PUBLISHED" = "not-found" ]; then
-            echo "should_publish=true" >> $GITHUB_OUTPUT
-            echo "Version ${{ steps.package.outputs.version }} not found on npm, will publish"
-          else
-            echo "should_publish=false" >> $GITHUB_OUTPUT
-            echo "Version ${{ steps.package.outputs.version }} already exists on npm, skipping"
-          fi
+        run: node scripts/check-release.mjs
 
       - name: Install dependencies
         if: steps.check.outputs.should_publish == 'true'
         run: npm ci
 
-      - name: Build
+      - name: Verify npm package
         if: steps.check.outputs.should_publish == 'true'
-        run: npm run build
+        run: npm run test:package
 
       - name: Publish to npm
         if: steps.check.outputs.should_publish == 'true'
