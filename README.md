@@ -10,6 +10,7 @@ Agents can write and run code, but when something goes wrong, they're blind. The
 
 ## Features
 
+- **Persistent sessions (unreleased)**: Pause once, inspect and step through separate CLI calls
 - **Multi-language support**: .NET, Python, Node.js, C/C++/Rust (via LLDB)
 - **Breakpoints**: Line, conditional (`file:line?condition`), hit count (`file:line#count`)
 - **Exception breakpoints**: Break on thrown/uncaught exceptions
@@ -115,6 +116,27 @@ npx debug-run ./dist/index.js \
   -b "src/handler.ts:30" \
   --pretty
 ```
+
+### Follow-up debugging across CLI calls (unreleased)
+
+```bash
+debug-run start ./dist/index.js -a node -b "src/handler.ts:30" --timeout 10m
+# Use sessionId from the JSON response in subsequent calls:
+debug-run status <session-id>
+debug-run inspect <session-id> --expr "request.body"
+debug-run step <session-id>
+debug-run status <session-id>
+debug-run continue <session-id>
+debug-run stop <session-id>
+```
+
+The target stays paused at each stop until you resume it. Poll `status` after stepping;
+use its `stop.id` with `--stop` to reject commands based on an old pause. Sessions
+expire after 10 minutes by default, including paused time.
+
+These commands are in the development source and are **not in npm 0.6.0**. See the
+[live session guide](docs/live-sessions.md) for running from source, attaching,
+JSON responses, lifecycle rules, and limits.
 
 ## CLI Reference
 

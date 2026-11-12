@@ -80,6 +80,39 @@ npx debug-run ./main.py -a python -b "src/processor.py:25" --pretty
 npx debug-run ./dist/index.js -a node -b "src/index.ts:100" --pretty
 ```
 
+## Persistent Sessions (Development Version)
+
+Check `debug-run start --help` before using these commands; npm 0.6.0 does not include them.
+Use a persistent session when the next expression or step depends on what you learn at a stop.
+
+```bash
+debug-run start ./dist/index.js -a node -b "src/handler.ts:30" --timeout 10m
+# Read sessionId from the JSON result, then use it in separate calls:
+debug-run status <session-id>
+debug-run inspect <session-id> --expr "request.body" --stop <stop-id>
+debug-run step <session-id> --stop <stop-id>
+debug-run status <session-id>
+debug-run continue <session-id> --stop <new-stop-id>
+debug-run stop <session-id>
+```
+
+Poll `status` until `result.state` is `paused` and `result.stop.ready` is true before
+inspection. Read the current `result.stop.id` and stack from that response. Frame IDs
+are valid only for that stop; explicit `--frame` requires `--stop`. After `STALE_STOP`,
+read status again. `step` defaults to over; use `--into` or `--out` for other steps.
+`inspect` with no expression reads locals; expressions can execute code in the target.
+
+Each command returns one JSON object with `schemaVersion`, `ok`, and `result` or `error`.
+A successful command exits 0 even if the target's status reports a failure; inspect
+`result.state`, `result.outcome`, and any `result.exitCode` separately. Errors exit 1.
+Sessions expire after 10 minutes including pauses (maximum 60 minutes); always stop
+when finished. Stopping a launched program terminates it; stopping an attached session
+disconnects and leaves the existing program running.
+
+For Node attach, enable a loopback inspector on the target and use
+`debug-run start -a node --attach --port 9229`; Node PID attach is not supported by
+this command. Other adapters accept `--attach --pid <pid>` subject to adapter support.
+
 ## Options Reference
 
 ### Core Options

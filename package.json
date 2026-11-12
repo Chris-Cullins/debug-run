@@ -18,7 +18,8 @@
     "format:check": "prettier --check src/",
     "prepack": "npm run build",
     "check": "npm run typecheck && npm run format:check && npm run test:run",
-    "test:package": "node scripts/test-package.mjs"
+    "test:package": "node scripts/test-package.mjs",
+    "test:live": "npm run build && node scripts/test-live-session.mjs"
   },
   "lint-staged": {
     "src/**/*.{ts,js}": [

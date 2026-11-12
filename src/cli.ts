@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createRequire } from 'node:module';
 import { Command, Option } from 'commander';
+import { registerLiveCommands } from './live/cli.js';
 import { getAdapter, getAdapterNames } from './adapters/index.js';
 import { DebugSession } from './session/manager.js';
 import { OutputFormatter } from './output/formatter.js';
@@ -94,7 +95,7 @@ export function parseTimeout(value: string): number {
 }
 
 export function createCli(): Command {
-  const program = new Command();
+  const program = new Command().enablePositionalOptions();
 
   program
     .name('debug-run')
@@ -382,6 +383,7 @@ export function createCli(): Command {
       }
     );
 
+  registerLiveCommands(program);
   return program;
 }
 

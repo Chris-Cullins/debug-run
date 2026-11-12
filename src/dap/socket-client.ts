@@ -110,9 +110,41 @@ export class SocketDapClient extends EventEmitter {
       this.emit('serverError', error);
     });
 
-    // Wait for server to start
-    const delay = this.options.connectDelay ?? 1000;
-    await new Promise((resolve) => setTimeout(resolve, delay));
+    // Port zero is used by live sessions so concurrent workers cannot share a server.
+    if (this.options.port === 0) {
+      this.options.port = await new Promise<number>((resolve, reject) => {
+        let output = '';
+        const cleanup = () => {
+          clearTimeout(timer);
+          this.removeListener('serverOutput', onOutput);
+          this.removeListener('serverError', onError);
+          this.removeListener('serverExit', onExit);
+        };
+        const onOutput = (chunk: string) => {
+          output = (output + chunk).slice(-4096);
+          const match = output.match(/Debug server listening at [^\r\n]*:(\d+)/);
+          if (match && Number(match[1]) > 0) {
+            cleanup();
+            resolve(Number(match[1]));
+          }
+        };
+        const onError = (error: Error) => {
+          cleanup();
+          reject(error);
+        };
+        const onExit = () => onError(new Error('Debug adapter exited before announcing its port'));
+        const timer = setTimeout(
+          () => onError(new Error('Debug adapter startup timed out')),
+          10000
+        );
+        this.on('serverOutput', onOutput);
+        this.once('serverError', onError);
+        this.once('serverExit', onExit);
+      });
+    } else {
+      const delay = this.options.connectDelay ?? 1000;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
 
     // Connect to the socket
     // Use localhost to support both IPv4 and IPv6
@@ -125,6 +157,8 @@ export class SocketDapClient extends EventEmitter {
     await this.transport.connect();
 
     // Forward events
+    this.transport.on('event:continued', () => this.emit('continued'));
+
     this.transport.on('event:stopped', (body: StoppedEventBody) => {
       this.emit('stopped', body);
     });
@@ -403,7 +437,10 @@ export class SocketDapClient extends EventEmitter {
       }
     }
 
-    if (!this.transport?.isOpen()) return;
+    if (!this.transport?.isOpen()) {
+      this.process?.kill();
+      return;
+    }
 
     try {
       await this.transport.sendRequest('disconnect', {
@@ -485,6 +522,8 @@ export class SocketDapClient extends EventEmitter {
     }
 
     // Forward events from child session to our main event emitter
+    this.childTransport.on('event:continued', () => this.emit('continued'));
+
     this.childTransport.on('event:stopped', (body: StoppedEventBody) => {
       if (process.env.DEBUG_DAP) {
         console.error('[DAP child] stopped event:', JSON.stringify(body));

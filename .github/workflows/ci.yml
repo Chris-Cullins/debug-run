@@ -38,6 +38,14 @@ jobs:
       - name: Verify npm package
         run: npm run test:package
 
+      - name: Verify persistent sessions with js-debug
+        if: matrix.node == '24'
+        env:
+          DEBUG_RUN_HOME: ${{ runner.temp }}/debug-run-live
+        run: |
+          node dist/index.cjs install-adapter node
+          npm run test:live
+
       - name: Check TypeScript sample
         run: |
           npm ci --prefix samples/typescript
