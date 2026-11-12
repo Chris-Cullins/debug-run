@@ -10,6 +10,8 @@ Agents can write and run code, but when something goes wrong, they're blind. The
 
 ## Features
 
+- **Doctor diagnostics (unreleased)**: Check setup and query adapter capabilities without launching your program
+- **Breakpoint evidence (unreleased)**: Distinguish binding failures from unobserved hits, with requested/resolved locations
 - **Persistent sessions (unreleased)**: Pause once, inspect and step through separate CLI calls
 - **Multi-language support**: .NET, Python, Node.js, C/C++/Rust (via LLDB)
 - **Breakpoints**: Line, conditional (`file:line?condition`), hit count (`file:line#count`)
@@ -116,6 +118,18 @@ npx debug-run ./dist/index.js \
   -b "src/handler.ts:30" \
   --pretty
 ```
+
+### Diagnose setup before debugging (unreleased)
+
+```bash
+debug-run doctor ./dist/app.js -a node -b "src/orders.ts:42" --json
+debug-run doctor ./dist/app.js -a node --probe --json
+```
+
+`doctor` checks local prerequisites and reports stable diagnostic codes with suggested
+fixes. `--probe` also starts the adapter and queries its DAP capabilities; neither command
+launches or attaches to your target. A successful check is not proof that a breakpoint binds.
+See [doctor and breakpoint diagnostics](docs/diagnostics.md) for the evidence and exit-code contract.
 
 ### Follow-up debugging across CLI calls (unreleased)
 

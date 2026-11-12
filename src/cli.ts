@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createRequire } from 'node:module';
 import { Command, Option } from 'commander';
+import { diagnose, formatDoctorReport, type DoctorOptions } from './doctor/report.js';
 import { registerLiveCommands } from './live/cli.js';
 import { getAdapter, getAdapterNames } from './adapters/index.js';
 import { DebugSession } from './session/manager.js';
@@ -382,6 +383,21 @@ export function createCli(): Command {
         }
       }
     );
+
+  program
+    .command('doctor [program]')
+    .description('Check debugger prerequisites; optionally probe DAP without launching the target')
+    .requiredOption('-a, --adapter <name>', 'Debug adapter')
+    .option('--cwd <path>', 'Working directory and base for relative target/source paths')
+    .option('-b, --breakpoint <spec...>', 'Breakpoint locations to check', [])
+    .option('--source-map-overrides <jsonOrPreset>', 'Source-map path overrides')
+    .option('--probe', 'Start the adapter and query DAP capabilities; do not launch the target')
+    .option('--json', 'Output a structured diagnostic report')
+    .action(async (target: string | undefined, options: DoctorOptions & { json?: boolean }) => {
+      const report = await diagnose(target, options);
+      console.log(options.json ? JSON.stringify(report) : formatDoctorReport(report));
+      if (!report.ok) process.exitCode = 1;
+    });
 
   registerLiveCommands(program);
   return program;

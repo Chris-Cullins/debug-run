@@ -45,6 +45,7 @@ try {
     });
   assert.equal(run('--version').trim(), packed.version);
   assert.match(run('--help'), /Usage: debug-run/);
+  assert.match(run('doctor', '--help'), /--probe/);
   const destination = join(directory, 'installed-skill');
   run('install-skill', '--dir', destination);
   for (const file of skills) {

@@ -28,7 +28,7 @@ async function findPythonCommand(): Promise<string | null> {
 
   // Try python3 first (more explicit on systems with both Python 2 and 3)
   try {
-    await execAsync('python3 --version');
+    await execAsync('python3 --version', { timeout: 5000, maxBuffer: 65536 });
     return 'python3';
   } catch {
     // Fall through
@@ -36,7 +36,7 @@ async function findPythonCommand(): Promise<string | null> {
 
   // Try python
   try {
-    await execAsync('python --version');
+    await execAsync('python --version', { timeout: 5000, maxBuffer: 65536 });
     return 'python';
   } catch {
     return null;
@@ -52,7 +52,7 @@ async function checkPipDebugpy(pythonCmd: string): Promise<boolean> {
   const execAsync = promisify(exec);
 
   try {
-    await execAsync(`${pythonCmd} -c "import debugpy"`);
+    await execAsync(`${pythonCmd} -c "import debugpy"`, { timeout: 5000, maxBuffer: 65536 });
     return true;
   } catch {
     return false;

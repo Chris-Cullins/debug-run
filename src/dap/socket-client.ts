@@ -656,6 +656,7 @@ export class SocketDapClient extends EventEmitter {
         'setBreakpoints',
         bp
       );
+      this.emit('breakpointBindings', { file: bp.source.path, breakpoints: response.breakpoints });
       if (process.env.DEBUG_DAP) {
         console.error('[DAP child] Breakpoint response:', JSON.stringify(response, null, 2));
       }

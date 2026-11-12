@@ -6,9 +6,9 @@
 
 import * as path from 'node:path';
 import type { IDapClient } from '../dap/client-interface.js';
-import type { SourceBreakpoint } from '../dap/protocol.js';
+import type { Breakpoint, BreakpointEventBody, SourceBreakpoint } from '../dap/protocol.js';
 import type { OutputFormatter } from '../output/formatter.js';
-import type { BreakpointDiagnostics } from '../output/events.js';
+import type { BreakpointDiagnostics, BreakpointReport } from '../output/events.js';
 
 export interface BreakpointSpec {
   file: string;
@@ -22,6 +22,11 @@ export interface TrackedBreakpoint extends BreakpointSpec {
   id?: number;
   verified: boolean;
   message?: string;
+  adapterId?: number;
+  requestedLine: number;
+  resolvedFile?: string;
+  hits: number;
+  rejected?: boolean;
 }
 
 export interface PathResolutionOptions {
@@ -155,7 +160,7 @@ export function validateBreakpointSpec(spec: string): BreakpointValidationResult
   }
 
   // Check for valid line number (must be positive)
-  if (isNaN(line) || line < 1) {
+  if (!Number.isSafeInteger(line) || line < 1) {
     return {
       valid: false,
       error: `Invalid line number "${lineStr}" in breakpoint "${spec}". Line must be a positive integer`,
@@ -252,7 +257,7 @@ export function validateLogpointSpec(spec: string): BreakpointValidationResult {
   }
 
   // Check for valid line number (must be positive)
-  if (isNaN(line) || line < 1) {
+  if (!Number.isSafeInteger(line) || line < 1) {
     return {
       valid: false,
       error: `Invalid line number "${lineStr}" in logpoint "${spec}". Line must be a positive integer`,
@@ -316,7 +321,7 @@ export function parseBreakpointSpec(
   const [, file, lineStr, condition, hitCount] = match;
   const line = parseInt(lineStr, 10);
 
-  if (isNaN(line) || line < 1) {
+  if (!Number.isSafeInteger(line) || line < 1) {
     throw new Error(`Invalid line number: ${lineStr}`);
   }
 
@@ -351,7 +356,7 @@ export function parseLogpointSpec(
   const [, file, lineStr, logMessage] = match;
   const line = parseInt(lineStr, 10);
 
-  if (isNaN(line) || line < 1) {
+  if (!Number.isSafeInteger(line) || line < 1) {
     throw new Error(`Invalid line number: ${lineStr}`);
   }
 
@@ -412,6 +417,8 @@ export class BreakpointManager {
     existing.push({
       ...spec,
       verified: false,
+      requestedLine: spec.line,
+      hits: 0,
     });
     this.breakpoints.set(spec.file, existing);
   }
@@ -430,69 +437,108 @@ export class BreakpointManager {
    */
   private async setFileBreakpoints(file: string, specs: TrackedBreakpoint[]): Promise<void> {
     const sourceBreakpoints: SourceBreakpoint[] = specs.map((spec) => ({
-      line: spec.line,
+      line: spec.requestedLine,
       condition: spec.condition,
       hitCondition: spec.hitCondition,
       logMessage: spec.logMessage,
     }));
-
-    // Store original requested lines before they may be adjusted by the adapter
-    const requestedLines = specs.map((spec) => spec.line);
 
     try {
       const response = await this.client.setBreakpoints({
         source: { path: file },
         breakpoints: sourceBreakpoints,
       });
-
-      // Update tracked breakpoints with response
-      for (let i = 0; i < specs.length; i++) {
-        const bp = response.breakpoints[i];
-        if (bp) {
-          specs[i].id = bp.id ?? this.nextId++;
-          specs[i].verified = bp.verified;
-          specs[i].message = bp.message;
-          specs[i].line = bp.line ?? specs[i].line;
-
-          // Generate diagnostics for unverified breakpoints
-          const diagnostics = !bp.verified
-            ? this.generateDiagnostics(file, requestedLines[i], bp.message)
-            : undefined;
-
-          // Emit breakpoint_set event
-          this.formatter.breakpointSet(
-            specs[i].id!,
-            file,
-            specs[i].line,
-            specs[i].verified,
-            specs[i].condition,
-            specs[i].message,
-            diagnostics
-          );
-        }
-      }
+      this.applyBindings(file, response.breakpoints);
     } catch (error) {
-      // Emit error for each breakpoint that failed
-      for (let i = 0; i < specs.length; i++) {
-        const spec = specs[i];
-        spec.id = this.nextId++;
+      for (const spec of specs) {
+        spec.id ??= -this.nextId++;
         spec.verified = false;
+        spec.rejected = true;
         spec.message = error instanceof Error ? error.message : 'Failed to set breakpoint';
-
-        // Generate diagnostics for the error case
-        const diagnostics = this.generateDiagnostics(file, requestedLines[i], spec.message);
-
-        this.formatter.breakpointSet(
-          spec.id,
-          file,
-          spec.line,
-          false,
-          spec.condition,
-          spec.message,
-          diagnostics
-        );
+        this.emitBinding(spec);
       }
     }
+  }
+
+  /** Index association preserves distinct conditional breakpoints on the same line. */
+  applyBindings(file: string, bindings: Breakpoint[]): void {
+    const specs = this.breakpoints.get(file) ?? [];
+    for (let index = 0; index < specs.length; index++) {
+      const spec = specs[index];
+      const binding = bindings[index];
+      spec.id = binding?.id ?? spec.id ?? -this.nextId++;
+      spec.adapterId = binding?.id;
+      spec.verified = binding?.verified ?? false;
+      spec.message =
+        binding?.message ?? (binding ? undefined : 'Adapter returned no binding for this request.');
+      spec.rejected = false;
+      spec.line = binding?.line ?? spec.requestedLine;
+      spec.resolvedFile = binding?.source?.path;
+      this.emitBinding(spec);
+    }
+  }
+
+  updateBinding(event: BreakpointEventBody): void {
+    if (event.breakpoint.id === undefined) return;
+    const spec = this.getAllBreakpoints().find((bp) => bp.adapterId === event.breakpoint.id);
+    if (!spec) return;
+    const bp = event.breakpoint;
+    spec.verified = event.reason !== 'removed' && bp.verified;
+    spec.message =
+      bp.message ?? (event.reason === 'removed' ? 'Adapter removed the breakpoint.' : undefined);
+    spec.line = bp.line ?? spec.line;
+    spec.resolvedFile = bp.source?.path ?? spec.resolvedFile;
+    this.emitBinding(spec);
+  }
+
+  recordHits(ids: number[] = []): void {
+    for (const id of new Set(ids)) {
+      const spec = this.getAllBreakpoints().find((bp) => bp.adapterId === id);
+      if (spec) spec.hits++;
+    }
+  }
+
+  getReport(): BreakpointReport[] {
+    return this.getAllBreakpoints().map((bp) => ({
+      id: bp.id,
+      requested: { file: bp.file, line: bp.requestedLine },
+      resolved: bp.verified ? { file: bp.resolvedFile ?? bp.file, line: bp.line } : undefined,
+      binding: bp.rejected ? 'rejected' : bp.verified ? 'verified' : 'unverified',
+      hitStatus: bp.hits > 0 ? 'observed' : 'not_observed',
+      hits: bp.hits,
+      code: bp.rejected
+        ? 'BREAKPOINT_REJECTED'
+        : bp.hits > 0
+          ? 'BREAKPOINT_REACHED'
+          : bp.verified
+            ? 'BREAKPOINT_VERIFIED'
+            : 'BREAKPOINT_UNVERIFIED',
+      adapterMessage: bp.message,
+      suggestions:
+        bp.verified || bp.hits > 0
+          ? []
+          : getBreakpointSuggestions(this.adapterType, path.extname(bp.file), bp.message),
+    }));
+  }
+
+  private emitBinding(spec: TrackedBreakpoint): void {
+    this.formatter.breakpointSet(
+      spec.id!,
+      spec.resolvedFile ?? spec.file,
+      spec.line,
+      spec.verified,
+      spec.condition,
+      spec.message,
+      {
+        ...this.generateDiagnostics(spec.file, spec.requestedLine, spec.message),
+        resolvedFile: spec.verified ? (spec.resolvedFile ?? spec.file) : undefined,
+        resolvedLine: spec.verified ? spec.line : undefined,
+        suggestions:
+          spec.verified || spec.hits > 0
+            ? []
+            : this.generateDiagnostics(spec.file, spec.requestedLine, spec.message).suggestions,
+      }
+    );
   }
 
   /**
@@ -521,9 +567,7 @@ export class BreakpointManager {
    * Get the count of breakpoints that were hit
    */
   getHitCount(): number {
-    // This would need to be tracked during the session
-    // For now, return 0
-    return 0;
+    return this.getAllBreakpoints().reduce((total, bp) => total + bp.hits, 0);
   }
 
   /**

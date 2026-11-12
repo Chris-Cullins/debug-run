@@ -92,9 +92,27 @@ try {
   await symlink(join(sourceHome, 'adapters'), join(directory, 'adapters'), 'junction');
   const fixture = join(directory, 'app.cjs');
   await writeFile(fixture, 'let total = 1;\ntotal += 2;\ntotal *= 3;\nconsole.log(total);\n');
-  const id = await start(fixture, '-b', `${fixture}:3`, '--timeout', '30s');
+  const preflight = await command('doctor', fixture, '-a', 'node', '--json');
+  assert.equal(preflight.ok, true, JSON.stringify(preflight));
+  assert.equal(
+    preflight.checks.find((check) => check.code === 'ADAPTER_HANDSHAKE').status,
+    'skipped'
+  );
+  const probe = await command('doctor', fixture, '-a', 'node', '--probe', '--json');
+  assert.equal(probe.ok, true, JSON.stringify(probe));
+  assert.equal(probe.checks.find((check) => check.code === 'ADAPTER_HANDSHAKE').status, 'pass');
+  assert.equal((await command('doctor', fixture, '-a', 'node', '-b', 'bad', '--json')).ok, false);
+  console.log(
+    'PASS: doctor checks prerequisites and probes the real adapter without launching a target'
+  );
+  const id = await start(fixture, '-b', `${fixture}:3`, `${fixture}:4?false`, '--timeout', '30s');
   const first = await waitFor(id, (status) => status.state === 'paused' && status.stop.ready);
   assert.equal(first.stop.stack[0].line, 3);
+  // js-debug may retain its provisional binding flag even after reporting a hit.
+  assert.equal(first.breakpoints[0].code, 'BREAKPOINT_REACHED', JSON.stringify(first.breakpoints));
+  assert.equal(first.breakpoints[0].hitStatus, 'observed', JSON.stringify(first.breakpoints));
+  assert.equal(first.breakpoints[0].requested.line, 3);
+  assert.equal(first.breakpoints[1].hitStatus, 'not_observed');
   const inspected = await command('inspect', id, '--expr', 'total');
   assert.equal(inspected.result.value.value, 3);
   assert.equal(inspected.result.stopId, first.stop.id);
@@ -141,6 +159,9 @@ try {
   assert.ok(['exited', 'terminated'].includes(ended.outcome));
   if (ended.outcome === 'exited') assert.equal(ended.exitCode, 0);
   await waitForCleanup(id);
+  const completed = await command('status', id);
+  assert.equal(completed.result.breakpoints[0].hitStatus, 'observed');
+  assert.equal(completed.result.breakpoints[1].hitStatus, 'not_observed');
   assert.equal((await command('inspect', id)).error.code, 'SESSION_ENDED');
   sessions.delete(id);
   console.log(

@@ -469,6 +469,7 @@ export class OutputFormatter {
     breakpointsHit: number;
     exceptionsCaught: number;
     stepsExecuted: number;
+    breakpoints?: import('./events.js').BreakpointReport[];
   }): void {
     this.emit(this.createEvent('session_end', { summary }));
   }

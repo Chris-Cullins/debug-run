@@ -134,6 +134,53 @@ describe('live sessions use shared DAP lifecycle', () => {
     await run;
   });
 
+  it.each([false, true])(
+    'includes binding and hit evidence in completed sessions (live: %s)',
+    async (live) => {
+      const { client, control, formatter, adapter } = setup();
+      const summary = vi.spyOn(formatter, 'sessionEnd');
+      client.setBreakpoints.mockResolvedValue({
+        breakpoints: [{ id: 7, verified: true, line: 4 }],
+      });
+      const session = new DebugSession(
+        {
+          adapter,
+          control: live ? control : undefined,
+          program: '/tmp/app',
+          breakpoints: ['/tmp/app.js:3'],
+          captureLocals: false,
+          timeout: 1000,
+        },
+        formatter
+      );
+      const run = session.run();
+      await vi.waitFor(() => expect(client.launch).toHaveBeenCalled());
+      client.emit('stopped', { reason: 'breakpoint', threadId: 1, hitBreakpointIds: [7] });
+      await vi.waitFor(() => expect(client.stackTrace).toHaveBeenCalled());
+      if (live) {
+        await vi.waitFor(() => expect(control.snapshot().stop?.ready).toBe(true));
+        expect(control.snapshot().breakpoints?.[0]).toMatchObject({
+          binding: 'verified',
+          hitStatus: 'observed',
+        });
+      } else await vi.waitFor(() => expect(client.continue).toHaveBeenCalled());
+      client.emit('terminated');
+      await run;
+      expect(summary).toHaveBeenCalledWith(
+        expect.objectContaining({
+          breakpointsHit: 1,
+          breakpoints: [
+            expect.objectContaining({
+              requested: { file: '/tmp/app.js', line: 3 },
+              resolved: { file: '/tmp/app.js', line: 4 },
+              hits: 1,
+            }),
+          ],
+        })
+      );
+    }
+  );
+
   it('cleans up an early attach rejection without waiting for initialized', async () => {
     const { client, control, formatter, adapter } = setup(true);
     client.attach.mockRejectedValue(new Error('Attach refused'));
