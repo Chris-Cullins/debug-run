@@ -24,6 +24,8 @@ Agents can write and run code, but when something goes wrong, they're blind. The
 
 ## Installation
 
+Requires Node.js **22.22.1 or newer**. Node 18 and 20 are no longer supported as of debug-run 0.6.0.
+
 ```bash
 # Install globally
 npm install -g debug-run
@@ -89,7 +91,7 @@ npx debug-run list-adapters
 ### Debug a .NET application
 
 ```bash
-npx debug-run ./bin/Debug/net8.0/MyApp.dll \
+npx debug-run ./bin/Debug/net10.0/MyApp.dll \
   -a dotnet \
   -b "src/OrderService.cs:45" \
   --pretty
@@ -279,7 +281,7 @@ Available debug adapters:
 ### Investigate a test failure
 
 ```bash
-npx debug-run ./bin/Debug/net8.0/TestApp.dll \
+npx debug-run ./bin/Debug/net10.0/TestApp.dll \
   -a dotnet \
   -b "src/InventoryService.cs:34" \
   -e "requestedQuantity" \
@@ -396,7 +398,7 @@ import json
 
 result = subprocess.run([
     "npx", "debug-run",
-    "./bin/Debug/net8.0/MyApp.dll",
+    "./bin/Debug/net10.0/MyApp.dll",
     "-a", "dotnet",
     "-b", "src/Service.cs:45",
     "-e", "order.Total",
@@ -411,6 +413,8 @@ for line in result.stdout.strip().split('\n'):
 ```
 
 ## Development
+
+The .NET samples require the .NET 10 SDK. Some sample tests deliberately contain bugs for debugging practice.
 
 ```bash
 # Install dependencies
@@ -428,6 +432,11 @@ npm run build
 # Run tests
 npm test
 ```
+
+## Releases
+
+Merging a new package version into `main` automatically publishes it to npm after CI passes.
+See [the release guide](docs/releasing.md) for the version bump, trusted publishing setup, and recovery steps.
 
 ## Architecture
 

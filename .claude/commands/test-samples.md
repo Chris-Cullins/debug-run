@@ -28,7 +28,7 @@ cd samples/dotnet && dotnet build && cd ../..
 
 ### Basic Breakpoint Test
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   --pretty \
@@ -44,7 +44,7 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
 
 ### Expression Evaluation
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   -e "order.Total" \
@@ -60,7 +60,7 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
 
 ### Assertions
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   --assert "order.Total >= 0" \
@@ -75,7 +75,7 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
 
 ### Trace Mode
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   --trace \
@@ -91,7 +91,7 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
 
 ### Trace with Variable Diffing
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   --trace \
@@ -307,7 +307,7 @@ cd samples/enterprise && dotnet build && cd ../..
 
 ### Default Token Optimizations
 ```bash
-npx debug-run ./samples/enterprise/bin/Debug/net8.0/EnterpriseApp.dll \
+npx debug-run ./samples/enterprise/bin/Debug/net10.0/EnterpriseApp.dll \
   -a vsdbg \
   -b "samples/enterprise/Program.cs:50" \
   --pretty \
@@ -321,7 +321,7 @@ npx debug-run ./samples/enterprise/bin/Debug/net8.0/EnterpriseApp.dll \
 
 ### Disabled Optimizations
 ```bash
-npx debug-run ./samples/enterprise/bin/Debug/net8.0/EnterpriseApp.dll \
+npx debug-run ./samples/enterprise/bin/Debug/net10.0/EnterpriseApp.dll \
   -a vsdbg \
   -b "samples/enterprise/Program.cs:50" \
   --expand-services \
@@ -342,7 +342,7 @@ npx debug-run ./samples/enterprise/bin/Debug/net8.0/EnterpriseApp.dll \
 
 ### Invalid Breakpoint Path
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "nonexistent/File.cs:10" \
   --pretty \
@@ -356,7 +356,7 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
 
 ### Invalid Expression
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   -e "nonexistent.property" \
@@ -371,7 +371,7 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
 
 ### Assertion Failure
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   --assert "order.Total < 0" \
@@ -386,7 +386,7 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
 
 ### Exception Breakpoints
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   --break-on-exception all \
   --pretty \
@@ -401,7 +401,7 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
 
 ### Output Filtering
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   --include breakpoint_hit session_end \
@@ -415,7 +415,7 @@ npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
 
 ### Output to File
 ```bash
-npx debug-run ./samples/dotnet/bin/Debug/net8.0/SampleApp.dll \
+npx debug-run ./samples/dotnet/bin/Debug/net10.0/SampleApp.dll \
   -a vsdbg \
   -b "samples/dotnet/Program.cs:67" \
   -o /tmp/debug-output.json \
